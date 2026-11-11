@@ -57,8 +57,15 @@ h1 .short{display:none}
 .sheet{flex:none;height:40%;min-height:0;display:flex;flex-direction:column;background:var(--panel);border-bottom:1px solid var(--line)}
 .sheet.closed{height:auto}
 .sheet.closed .scroll,.sheet.closed .status{display:none}
-.handle{display:flex;align-items:center;gap:10px;padding-right:16px;border-bottom:1px solid var(--line)}
-.sheet.closed .handle{border-bottom:0}
+.handle{display:flex;align-items:center;gap:10px;padding-right:16px}
+/* 진행률 막대: 초록 = 완료, 빨강 = 이상 */
+.pbar{display:flex;height:4px;background:var(--line);overflow:hidden;flex:none}
+.pbar i{display:block;height:100%;width:0;transition:width .3s}
+.pbar .ok{background:var(--pin-ok)}.pbar .ng{background:var(--pin-bad)}
+.dpb{margin:0 16px 8px;border-radius:2px}
+.pct{font-weight:700;color:var(--fg)}
+.tab{position:relative;padding-bottom:10px!important}
+.tab .tb{position:absolute;left:12px;right:12px;bottom:4px;height:3px;border-radius:2px}
 .tgl{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:10px 0 10px 16px;border:0;background:none;cursor:pointer;text-align:left;font-weight:700;font-size:13.5px}
 .car{display:inline-block;transition:transform .15s;color:var(--muted);font-size:12px;width:12px;flex:none}
 .sheet.closed .tgl .car,.day.fold .car{transform:rotate(-90deg)}
@@ -105,7 +112,8 @@ h1 .short{display:none}
 .legend b{display:block;font-size:13px;margin-bottom:2px}
 .legend .sw{display:inline-block;width:22px;height:5px;border-radius:3px;vertical-align:middle;margin-right:8px}
 .legend .row{cursor:pointer}.legend .row:hover{text-decoration:underline}
-.legend .stl{display:flex;gap:8px;border-top:1px solid var(--line);margin-top:4px;padding-top:6px}
+.legend .stl{display:flex;align-items:center;gap:6px;border-top:1px solid var(--line);margin-top:4px;padding-top:6px}
+.legend .lk{color:var(--muted);font-size:12px}
 .lp{display:inline-block;color:#fff;font:700 11px/18px var(--font);font-style:normal;padding:0 8px;border-radius:9px}
 .locbtn{position:absolute;right:10px;bottom:30px;z-index:12;width:42px;height:42px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--fg);box-shadow:0 1px 5px rgba(0,0,0,.25);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
 .locbtn.on{color:var(--me)}
@@ -193,7 +201,7 @@ h1{font-size:14px}h1 .full{display:none}h1 .short{display:inline}.top p{display:
 .tab{flex:none;white-space:nowrap}.tab .tn{display:none}.tab .ts{display:inline}
 .sheet{height:42%}.tgl{padding-left:12px}.handle{padding-right:12px}
 .legend{display:none}
-.dayhead{padding:10px 12px 6px}.stop{padding:7px 12px}.leg{padding:0 12px 8px 46px}.status{padding:7px 12px}
+.dayhead{padding:10px 12px 6px}.dpb{margin:0 12px 8px}.stop{padding:7px 12px}.leg{padding:0 12px 8px 46px}.status{padding:7px 12px}
 .stops{grid-template-columns:minmax(0,1fr)}
 }
 </style>
@@ -209,9 +217,7 @@ h1{font-size:14px}h1 .full{display:none}h1 .short{display:inline}.top p{display:
 <button type="button" data-m="log">작업 로그 (점검자별)</button>
 <hr>
 <button type="button" data-m="who">점검자 이름 변경</button>
-<button type="button" data-m="code">팀 코드 변경</button>
 <button type="button" data-m="csv">점검 기록 CSV 내보내기</button>
-<button type="button" data-m="reset" class="danger">새 점검 회차 시작 (기록 초기화)</button>
 <hr>
 <button type="button" data-m="key">카카오 API 키 변경</button>
 </div>
@@ -222,6 +228,7 @@ h1{font-size:14px}h1 .full{display:none}h1 .short{display:inline}.top p{display:
 <button type="button" class="tgl" id="sheetBtn" aria-expanded="true" aria-controls="days"><span class="car">▾</span><span class="lbl">주소 목록</span><span class="sum" id="sum"></span></button>
 <label class="flt"><input type="checkbox" id="onlyTodo">완료 숨김</label>
 </div>
+<div class="pbar" id="pAll" role="img" aria-label="진행률"><i class="ok"></i><i class="ng"></i></div>
 <div class="scroll" id="days"></div>
 <div class="status"><div id="syncTxt"></div><div id="status">지도 준비 중…</div></div>
 </section>
@@ -244,20 +251,10 @@ h1{font-size:14px}h1 .full{display:none}h1 .short{display:inline}.top p{display:
 </div>
 <div class="modal" id="whoDlg" hidden>
 <form id="whoForm">
-<h2>점검자 이름</h2>
+<h2 id="whoTitle">점검자 이름</h2>
 <p>완료·이상·취소를 기록할 때 이 이름과 시간이 함께 남아 누가 점검했는지 알 수 있습니다. 이 기기에만 저장됩니다.</p>
 <input id="whoIn" maxlength="20" required placeholder="예: 홍길동" autocomplete="name">
 <div class="row"><button type="button" id="whoCancel">취소</button><button type="submit" class="pri">저장</button></div>
-</form>
-</div>
-<div class="modal" id="codeDlg" hidden>
-<form id="codeForm">
-<h2 id="codeTitle">시작하기</h2>
-<p>관리자에게 받은 팀 코드와 본인 이름을 입력하세요. 완료·이상·취소 기록에 이름과 시간이 남아 누가 점검했는지 알 수 있습니다. 이 기기에만 저장됩니다.</p>
-<label class="fl">팀 코드<input id="codeIn" maxlength="60" required autocomplete="off" placeholder="팀 코드"></label>
-<label class="fl">점검자 이름<input id="codeWho" maxlength="20" required autocomplete="name" placeholder="예: 홍길동"></label>
-<div class="err" id="codeErr"></div>
-<div class="row"><button type="button" id="codeCancel">나중에</button><button type="submit" class="pri">확인</button></div>
 </form>
 </div>
 <div class="modal" id="logDlg" hidden>
@@ -298,7 +295,7 @@ function each(fn){DAYS.forEach(function(D){D.stops.forEach(function(s){fn(s,D)})
 // BASE = 서버에서 받은 마지막 기록, OUT = 아직 서버에 못 올린 내 기록(오프라인이면 쌓아 두었다가 연결되면 업로드)
 // 화면에 보이는 REC = BASE 위에 OUT 을 다시 적용한 것
 var API="api/records",BKEY="inspectBase.v2",OKEY="inspectOutbox.v2",POLL_MS=20000;
-var ST_TXT={"":"미점검",done:"완료",bad:"이상있음"},who=ls("inspector"),teamCode=ls("teamCode");
+var ST_TXT={"":"미점검",done:"완료",bad:"이상있음"},who=ls("inspector");
 function loadJ(k,d){try{return JSON.parse(ls(k))||d}catch(e){return d}}
 var BASE=loadJ(BKEY,{etag:null,records:{},resetAt:0}),OUT=loadJ(OKEY,[]),REC={};
 function sk(s){return s.no+"|"+s.id}
@@ -340,11 +337,10 @@ function act(s,f,pre){needWho(function(){
 
 // ── 서버 동기화: 내 기록은 바로 업로드, 다른 사람 기록은 20초마다(화면이 켜져 있을 때) 받아옴 ──
 var SY={mode:"init",busy:false,last:0,fail:0,t:null};
-function apiHeaders(body){var h={};if(teamCode)h["x-team-code"]=encodeURIComponent(teamCode);if(body)h["content-type"]="application/json";return h}
+function apiHeaders(body){return body?{"content-type":"application/json"}:{}}
 function call(method,body,q){
   return fetch(API+(q||""),{method:method,headers:apiHeaders(body),body:body?JSON.stringify(body):undefined,cache:"no-store"}).then(function(r){
     var ct=r.headers.get("content-type")||"",e;
-    if(r.status===401){e=new Error("팀 코드");e.kind="auth";throw e}
     if(r.status===404||r.status===405||r.status===501||ct.indexOf("json")<0){e=new Error("공유 서버 없음");e.kind="local";throw e}
     if(!r.ok){e=new Error("서버 오류 "+r.status);e.kind="server";throw e}
     return r.json()});
@@ -366,14 +362,14 @@ function showChanges(before){
   if(remote.length)toast(remote.length===1?remote[0]:remote[0]+" 외 "+(remote.length-1)+"건");
 }
 function poll(){
-  if(SY.busy||SY.mode==="local"||SY.mode==="auth")return;
+  if(SY.busy||SY.mode==="local")return;
   SY.busy=true;
   call("GET",null,BASE.etag?"?since="+encodeURIComponent(BASE.etag):"").then(function(d){
     SY.busy=false;if(!d.unchanged)setBase(d);ok();if(OUT.length)flush();
   }).catch(fail);
 }
 function flush(){
-  if(SY.busy||!OUT.length||SY.mode==="local"||SY.mode==="auth")return;
+  if(SY.busy||!OUT.length||SY.mode==="local")return;
   SY.busy=true;var batch=OUT.slice(0,50),ids={};batch.forEach(function(a){ids[a.id]=1});
   call("POST",{actions:batch}).then(function(d){
     SY.busy=false;OUT=OUT.filter(function(a){return !ids[a.id]});ls(OKEY,JSON.stringify(OUT));setBase(d);ok();if(OUT.length)flush();
@@ -382,20 +378,18 @@ function flush(){
 function sync(){if(OUT.length)flush();else poll()}
 function ok(){SY.mode="shared";SY.last=Date.now();SY.fail=0;syncUI();nameFirst()}
 // 이름이 없으면 기록 전에 먼저 받음 (누가 점검했는지 남기기 위해)
-function nameFirst(){if(!who&&$("whoDlg").hidden&&$("codeDlg").hidden)askWho()}
+function nameFirst(){if(!who&&$("whoDlg").hidden)askWho()}
 function fail(e){SY.busy=false;var k=e&&e.kind;
-  if(k==="auth"){SY.mode="auth";syncUI();askCode(!!teamCode);return}
   if(k==="local"){SY.mode="local";syncUI();nameFirst();return}
   SY.mode=k==="server"?"error":"offline";SY.fail++;syncUI();
 }
-function tick(){clearTimeout(SY.t);if(!document.hidden&&SY.mode!=="local"&&SY.mode!=="auth")sync();
+function tick(){clearTimeout(SY.t);if(!document.hidden&&SY.mode!=="local")sync();
   SY.t=setTimeout(tick,SY.fail?Math.min(60000,POLL_MS*Math.pow(2,SY.fail-1)):POLL_MS)}
 function syncUI(){
   var b=$("syncBtn"),n=OUT.length,m=SY.mode,t,c,line;
   var last=SY.last?" · "+fmt(SY.last).slice(-5)+" 동기화":"";
   if(m==="shared"){c=n?"wait":"ok";t=n?"올리는 중 "+n:"공유 중";line="팀 공유 저장"+last+(n?" · 올릴 기록 "+n+"건":"")}
   else if(m==="offline"||m==="error"){c="off";t=n?"대기 "+n:"오프라인";line=(m==="error"?"공유 서버 오류":"인터넷 연결 없음")+" · 기록은 이 기기에 저장되고 연결되면 자동으로 올라갑니다"+(n?" (대기 "+n+"건)":"")}
-  else if(m==="auth"){c="off";t="팀 코드";line="팀 코드가 필요합니다 — 위의 '팀 코드' 버튼을 눌러 입력하세요"}
   else if(m==="local"){c="loc";t="이 기기만";line="공유 서버가 없어 이 기기에만 저장됩니다"+(n?" ("+n+"건)":"")}
   else{c="wait";t="연결 중";line="공유 서버 연결 중…"}
   b.className="sync "+c;b.innerHTML="<i></i>"+t;b.title=line;$("syncTxt").textContent=line;
@@ -406,7 +400,7 @@ window.addEventListener("online",function(){if(SY.mode==="offline"||SY.mode==="e
 // ── 점검자 ──
 var whoCb=null;
 function renderWho(){var b=$("whoBtn");b.innerHTML="<svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.2'><circle cx='12' cy='8' r='4'/><path d='M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7'/></svg><span>"+esc(who||"점검자 설정")+"</span>";b.classList.toggle("unset",!who)}
-function askWho(cb){whoCb=cb||null;$("whoIn").value=who;$("whoCancel").hidden=!who;$("whoDlg").hidden=false;setTimeout(function(){$("whoIn").focus()},30)}
+function askWho(cb){whoCb=cb||null;$("whoIn").value=who;$("whoCancel").hidden=!who;$("whoTitle").textContent=who?"점검자 이름 변경":"시작하기 — 점검자 이름";$("whoDlg").hidden=false;setTimeout(function(){$("whoIn").focus()},30)}
 function needWho(cb){if(who)cb();else askWho(cb)}
 $("whoForm").onsubmit=function(e){e.preventDefault();var v=$("whoIn").value.trim();if(!v)return;who=v;ls("inspector",v);renderWho();$("whoDlg").hidden=true;var cb=whoCb;whoCb=null;if(cb)cb();else toast("점검자: "+v)};
 $("whoCancel").onclick=function(){$("whoDlg").hidden=true;whoCb=null};
@@ -450,6 +444,7 @@ function rowHtml(D,s){var i=s.i,r=rec(s),v=r&&r.st||"",prev=i?D.stops[i-1]:null;
 DAYS.forEach(function(D,di){
   var sec=document.createElement("section");sec.className="day";sec.dataset.i=di;
   var h="<div class='dayhead' role='button' tabindex='0' aria-expanded='true'><span class='car'>▾</span><b style='color:"+D.color+"'>"+dayLabel(D,di)+"</b><span>"+esc(D.name)+"</span><span class='meta' id='m"+di+"'>"+D.stops.length+"개 지점"+loopTxt(D)+"</span><span class='prog' id='p"+di+"'></span></div>"
+    +"<div class='pbar dpb' id='pb"+di+"'><i class='ok'></i><i class='ng'></i></div>"
     +"<div class='body'>"+(D.lead?"<div class='leg'>⌂ "+esc(D.node)+"(상위국) 출발 → 1번까지 이동 약 "+Math.round(D.lead[0])+"km</div>":"")+"<ol class='stops'>";
   D.stops.forEach(function(s,i){var v=stOf(s);h+="<li class='stop"+(v?" "+v:"")+"' id='r"+di+"_"+i+"' data-i='"+i+"'>"+rowHtml(D,s)+"</li>"});
   sec.innerHTML=h+"</ol><div class='leg'>⌂ "+D.stops.length+"번 → "+esc(D.node)+"(상위국) 복귀 약 "+Math.round(D.tail[0])+"km</div></div>";
@@ -460,23 +455,29 @@ DAYS.forEach(function(D,di){
     if(active!==-1&&active!==di)show(di);openCard(di,+li.dataset.i,"zoom")});
   box.appendChild(sec);
 });
-function tab(label,color,i){var b=document.createElement("button");b.type="button";b.className="tab";b.dataset.i=i;b.innerHTML=(color?"<span class='dot' style='background:"+color+"'></span>":"")+label+"<span class='pg'></span>";b.onclick=function(){show(i)};tabs.appendChild(b)}
+function tab(label,color,i){var b=document.createElement("button");b.type="button";b.className="tab";b.dataset.i=i;b.innerHTML=(color?"<span class='dot' style='background:"+color+"'></span>":"")+label+"<span class='pg'></span><span class='pbar tb'><i class='ok'></i><i class='ng'></i></span>";b.onclick=function(){show(i)};tabs.appendChild(b)}
 tab("전체",null,-1);DAYS.forEach(function(D,i){
   var short=D.node.replace("노드","")+((D.name.match(/[①②③④⑤]/)||[""])[0]);
   tab(dayLabel(D,i)+"<span class='tn'> · "+esc(D.name)+"</span><span class='ts'> "+esc(short)+"</span>",D.color,i)});
 var lg=$("legend"),lh="<b>일차별 색상</b>";
 DAYS.forEach(function(D,i){lh+="<div class='row' data-i='"+i+"'><span class='sw' style='background:"+D.color+"'></span>"+dayLabel(D,i)+" · "+esc(D.name)+"</div>"});
-lg.innerHTML=lh+"<div class='row' data-i='-1' style='color:var(--muted)'>전체 보기</div><div class='stl'><i class='lp' style='background:var(--pin-ok)'>3 완료</i><i class='lp' style='background:var(--pin-bad)'>4 이상</i></div>";
+lg.innerHTML=lh+"<div class='row' data-i='-1' style='color:var(--muted)'>전체 보기</div><div class='stl'><span class='lk'>핀 색</span><i class='lp' style='background:var(--pin-ok)'>완료</i><i class='lp' style='background:var(--pin-bad)'>이상</i><span class='lk'>· 핀 숫자 = 방문 순서</span></div>";
 lg.querySelectorAll(".row").forEach(function(r){r.onclick=function(){show(+r.dataset.i)}});
 function cnt(D){var c={done:0,bad:0,n:D.stops.length};D.stops.forEach(function(s){var v=stOf(s);if(v)c[v]++});return c}
-function progress(){var T={done:0,bad:0,n:0},A={done:0,n:0};
+// 진행률 = 완료 ÷ 전체 지점. 막대는 초록(완료) + 빨강(이상)
+function pct(c){return c.n?Math.round(c.done/c.n*100):0}
+function setBar(el,c){if(!el)return;var b=el.children;b[0].style.width=(c.n?c.done/c.n*100:0)+"%";b[1].style.width=(c.n?c.bad/c.n*100:0)+"%";
+  el.title="진행 "+pct(c)+"% · 완료 "+c.done+" · 이상 "+c.bad+" / "+c.n}
+function progress(){var T={done:0,bad:0,n:0},A={done:0,bad:0,n:0};
   DAYS.forEach(function(D,di){var c=cnt(D);
-    $("p"+di).innerHTML="<span class='c-ok'>완료 "+c.done+"</span>"+(c.bad?" · <span class='c-bad'>이상 "+c.bad+"</span>":"")+" / "+c.n;
-    var pg=tabs.querySelector(".tab[data-i='"+di+"'] .pg");if(pg)pg.textContent=" "+c.done+"/"+c.n;
-    A.done+=c.done;A.n+=c.n;
+    $("p"+di).innerHTML="<b class='pct'>"+pct(c)+"%</b> · <span class='c-ok'>완료 "+c.done+"</span>"+(c.bad?" · <span class='c-bad'>이상 "+c.bad+"</span>":"")+" / "+c.n;
+    setBar($("pb"+di),c);
+    var tb=tabs.querySelector(".tab[data-i='"+di+"']");if(tb){tb.querySelector(".pg").textContent=" "+pct(c)+"%";setBar(tb.querySelector(".tb"),c)}
+    A.done+=c.done;A.bad+=c.bad;A.n+=c.n;
     if(active===-1||active===di){T.done+=c.done;T.bad+=c.bad;T.n+=c.n}});
-  tabs.querySelector(".tab[data-i='-1'] .pg").textContent=" "+A.done+"/"+A.n;
-  $("sum").innerHTML=" · "+T.n+"곳 · <span class='c-ok'>완료 "+T.done+"</span>"+(T.bad?" · <span class='c-bad'>이상 "+T.bad+"</span>":"")+" · 남음 "+(T.n-T.done-T.bad);
+  var ta=tabs.querySelector(".tab[data-i='-1']");ta.querySelector(".pg").textContent=" "+pct(A)+"%";setBar(ta.querySelector(".tb"),A);
+  $("sum").innerHTML=" · <b class='pct'>진행 "+pct(T)+"%</b> · <span class='c-ok'>완료 "+T.done+"</span>/"+T.n+(T.bad?" · <span class='c-bad'>이상 "+T.bad+"</span>":"")+" · 남음 "+(T.n-T.done-T.bad);
+  setBar($("pAll"),T);
 }
 function refresh(s){var D=DAYS[s.di],li=$("r"+s.di+"_"+s.i),v=stOf(s),sel=!!cur&&cur.di===s.di&&cur.i===s.i;
   if(li){li.className="stop"+(v?" "+v:"")+(sel?" sel":"");li.innerHTML=rowHtml(D,s)}
@@ -590,15 +591,9 @@ var menu=$("menu");
 $("menuBtn").onclick=function(e){e.stopPropagation();menu.hidden=!menu.hidden};
 document.addEventListener("click",function(e){if(!menu.hidden&&!e.target.closest("#menu"))menu.hidden=true});
 menu.onclick=function(e){var b=e.target.closest("[data-m]");if(!b)return;menu.hidden=true;var m=b.dataset.m;
-  if(m==="log")openLog();else if(m==="who")askWho();else if(m==="code")askCode(false);else if(m==="csv")exportCsv();else if(m==="reset")resetAll();else if(m==="key")askKey()};
-document.addEventListener("keydown",function(e){if(e.key!=="Escape")return;if(!$("whoDlg").hidden){if(who){$("whoDlg").hidden=true;whoCb=null}}else if(!$("codeDlg").hidden)$("codeDlg").hidden=true;else if(!$("logDlg").hidden)$("logDlg").hidden=true;else if(!menu.hidden)menu.hidden=true;else if(formMode){formMode=null;renderCard()}else closeCard()});
-// 시작하기: 팀 코드(Netlify 환경 변수 TEAM_CODE 와 같아야 공유 기록을 읽고 쓸 수 있음) + 점검자 이름
-function askCode(wrong){$("codeIn").value=teamCode;$("codeWho").value=who;$("codeTitle").textContent=teamCode&&who?"팀 코드":"시작하기";
-  $("codeErr").textContent=wrong?"팀 코드가 맞지 않습니다. 다시 확인해 주세요.":"";$("codeDlg").hidden=false;setTimeout(function(){$(teamCode&&!wrong?"codeWho":"codeIn").focus()},30)}
-$("codeForm").onsubmit=function(e){e.preventDefault();var v=$("codeIn").value.trim(),n=$("codeWho").value.trim();if(!v||!n)return;
-  teamCode=v;ls("teamCode",v);if(n!==who){who=n;ls("inspector",n);renderWho()}$("codeDlg").hidden=true;SY.mode="init";SY.fail=0;syncUI();tick()};
-$("codeCancel").onclick=function(){$("codeDlg").hidden=true};
-$("syncBtn").onclick=function(){if(SY.mode==="auth"){askCode(false);return}if(SY.mode==="local"){toast("공유 서버가 없어 이 기기에만 저장됩니다");return}
+  if(m==="log")openLog();else if(m==="who")askWho();else if(m==="csv")exportCsv();else if(m==="key")askKey()};
+document.addEventListener("keydown",function(e){if(e.key!=="Escape")return;if(!$("whoDlg").hidden){if(who){$("whoDlg").hidden=true;whoCb=null}}else if(!$("logDlg").hidden)$("logDlg").hidden=true;else if(!menu.hidden)menu.hidden=true;else if(formMode){formMode=null;renderCard()}else closeCard()});
+$("syncBtn").onclick=function(){if(SY.mode==="local"){toast("공유 서버가 없어 이 기기에만 저장됩니다");return}
   if(SY.mode!=="shared"){SY.mode="init";SY.fail=0}toast("동기화 중…");tick()};
 // 작업 로그: 모든 지점의 기록을 최신순으로, 점검자별로 골라 보기. 줄을 누르면 그 지점으로 이동
 var LOG=[];
@@ -628,16 +623,6 @@ function exportCsv(){
   var blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
   try{var f=new File([blob],name,{type:"text/csv"});if(/Android|iPhone|iPad/i.test(navigator.userAgent)&&navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f],title:name}).catch(function(){});return}}catch(e){}
   var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},1500);toast("CSV 저장: "+name)}
-// 새 점검 회차: 공유 중이면 모든 점검자의 기록이 비워짐(서버에 이전 기록 보관본이 남음)
-function resetAll(){if(!Object.keys(REC).length){toast("지울 기록이 없습니다");return}
-  if(SY.mode==="local"){
-    if(!confirm("이 기기의 점검 상태·메모·이력을 모두 지웁니다.\n되돌릴 수 없으니 먼저 CSV로 내보내 두세요.\n\n계속할까요?"))return;
-    var b0=REC;OUT=[];BASE={etag:null,records:{},resetAt:Date.now()};ls(OKEY,"[]");ls(BKEY,JSON.stringify(BASE));rebuild();showChanges(b0);if(cur)renderCard(true);toast("점검 기록을 초기화했습니다");return}
-  if(SY.mode!=="shared"){toast("공유 서버에 연결된 상태에서만 새 회차를 시작할 수 있습니다");return}
-  if(!confirm("새 점검 회차를 시작합니다.\n모든 점검자 화면에서 점검 상태·메모·이력이 비워집니다.\n(서버에 이전 기록 보관본이 남지만, 먼저 CSV로 내보내 두는 것을 권장합니다)\n\n계속할까요?"))return;
-  needWho(function(){call("POST",{op:"reset",by:who}).then(function(d){setBase(d);ok();if(cur)renderCard(true);toast("새 점검 회차를 시작했습니다")})
-    .catch(function(e){fail(e);toast("초기화 실패: 공유 서버에 연결되지 않습니다")})});
-}
 // 같은 기기의 다른 탭과 맞춤
 window.addEventListener("storage",function(e){if(e.key!==BKEY&&e.key!==OKEY)return;
   var b0=REC;BASE=loadJ(BKEY,{etag:null,records:{},resetAt:0});OUT=loadJ(OKEY,[]);rebuild();showChanges(b0);syncUI()});
@@ -720,6 +705,7 @@ $("keyform").onsubmit=function(e){e.preventDefault();
 renderWho();
 show(-1);
 syncUI();tick();
+if(!who)askWho(); // 처음 열면 이름부터 (누가 기록했는지 남기기 위해)
 // 위치 권한을 이미 허용했다면 바로 내 위치 표시 시작 (처음엔 ◎ 버튼을 눌러 허용)
 if(navigator.permissions&&navigator.permissions.query)navigator.permissions.query({name:"geolocation"}).then(function(p){if(p.state==="granted")startGps(false)}).catch(function(){});
 // 휴대폰 홈 화면 앱(PWA): 페이지를 저장해 두어 인터넷이 없을 때도 목록은 열리게 함

@@ -1,10 +1,9 @@
 // 점검 기록 공유 API — Netlify Functions + Netlify Blobs
 //   GET  /api/records[?since=<etag>]       → { etag, records, resetAt } (바뀐 게 없으면 { etag, unchanged: true })
 //   POST /api/records { actions: [...] }    → 기록 추가 후 { etag, records, resetAt }
-//   POST /api/records { op: "reset", by }   → 현재 기록을 archive/<시각> 에 보관하고 새 회차 시작
-// 팀 코드: Netlify 환경 변수 TEAM_CODE 를 설정하면 요청 헤더 x-team-code(encodeURIComponent)와 일치해야 함.
+// 팀 코드·초기화 없음: 주소를 아는 팀원(이름만 입력)이 함께 기록. 기록은 지우지 않고 취소도 이력으로 남김.
+// (resetAt 은 예전에 초기화했던 시각 — 그 이전 시각의 기록은 반영하지 않음)
 import { getStore } from "@netlify/blobs";
-import { createHash, timingSafeEqual } from "node:crypto";
 
 const DOC = "records";
 const MAX_LOG = 100;     // 지점별 이력 보관 개수
@@ -16,22 +15,6 @@ const json = (body, status = 200) =>
     status,
     headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
   });
-
-function teamCode() {
-  try {
-    const v = globalThis.Netlify?.env?.get("TEAM_CODE");
-    if (v != null) return v;
-  } catch {}
-  return process.env.TEAM_CODE || "";
-}
-const sha = (s) => createHash("sha256").update(String(s)).digest();
-function authorized(req) {
-  const code = teamCode();
-  if (!code) return true;
-  let got = req.headers.get("x-team-code") || "";
-  try { got = decodeURIComponent(got); } catch {}
-  return timingSafeEqual(sha(got.trim()), sha(code.trim()));
-}
 
 const str = (v, max) => (typeof v === "string" ? v.slice(0, max) : null);
 // 클라이언트가 보낸 기록 1건 검증 (잘못된 건 null → 건너뜀)
@@ -72,7 +55,6 @@ function applyAction(recs, a) {
 const view = (etag, doc) => ({ etag: etag || null, records: doc.records || {}, resetAt: doc.resetAt || 0 });
 
 export default async (req) => {
-  if (!authorized(req)) return json({ error: "team-code" }, 401);
   const store = getStore({ name: "inspection", consistency: "strong" });
 
   if (req.method === "GET") {
@@ -87,25 +69,17 @@ export default async (req) => {
   let body;
   try { body = await req.json(); } catch { return json({ error: "bad-json" }, 400); }
   const now = Date.now();
-  const reset = body && body.op === "reset";
-  const actions = reset ? [] : (Array.isArray(body?.actions) ? body.actions : []).slice(0, MAX_BATCH)
+  const actions = (Array.isArray(body?.actions) ? body.actions : []).slice(0, MAX_BATCH)
     .map((a) => clean(a, now)).filter(Boolean).sort((x, y) => x.at - y.at);
 
   // 동시에 여러 명이 저장해도 잃지 않도록: 읽은 버전(etag)이 그대로일 때만 쓰고, 아니면 다시 읽어서 재시도
   for (let attempt = 0; attempt < 8; attempt++) {
     const cur = await store.getWithMetadata(DOC, { type: "json" });
-    let doc = (cur && cur.data) || { records: {}, resetAt: 0 };
+    const doc = (cur && cur.data) || { records: {}, resetAt: 0 };
     if (!doc.records) doc.records = {};
-    if (reset) {
-      const by = (str(body.by, 20) || "?").trim();
-      if (Object.keys(doc.records).length) {
-        await store.setJSON("archive/" + new Date(now).toISOString(), { ...doc, archivedAt: now, archivedBy: by });
-      }
-      doc = { records: {}, resetAt: now, resetBy: by };
-    } else {
-      // 초기화 이전 회차에 찍힌 기록은 반영하지 않음
-      actions.forEach((a) => { if (a.at >= (doc.resetAt || 0)) applyAction(doc.records, a); });
-    }
+    let changed = false;
+    actions.forEach((a) => { if (a.at >= (doc.resetAt || 0) && applyAction(doc.records, a)) changed = true; });
+    if (!changed) return json(view(cur && cur.etag, doc)); // 새로 반영할 게 없으면 쓰지 않음
     doc.updatedAt = now;
     const w = cur
       ? await store.setJSON(DOC, doc, { onlyIfMatch: cur.etag })
