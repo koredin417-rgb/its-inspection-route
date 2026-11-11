@@ -41,9 +41,14 @@ function clean(a, now) {
   if (!id || !key || !by) return null;
   if (a.st != null && !STATUS.has(a.st)) return null;
   if (a.memo != null && typeof a.memo !== "string") return null;
+  if (a.note != null && typeof a.note !== "string") return null;
   let at = Number(a.at);
   if (!Number.isFinite(at) || at <= 0 || at > now + 5 * 60e3) at = now; // 미래 시각은 서버 시각으로
-  return { id, key, by, label: str(a.label, 40) || "", st: a.st ?? null, memo: a.memo == null ? null : a.memo.slice(0, 500), at };
+  return {
+    id, key, by, label: str(a.label, 40) || "", st: a.st ?? null, at,
+    memo: a.memo == null ? null : a.memo.slice(0, 500), // 지점의 현재 이상 사유 (완료·취소 시 "")
+    note: a.note == null ? null : a.note.slice(0, 500), // 이 기록 한 줄의 사유 (이상 사유 / 취소 사유)
+  };
 }
 
 // 클라이언트(index.html)의 applyAction 과 같은 규칙:
@@ -56,7 +61,8 @@ function applyAction(recs, a) {
   if (a.at >= (r.at || 0)) { r.at = a.at; r.by = a.by; }
   const e = { id: a.id, a: a.label, by: a.by, at: a.at };
   if (a.st != null) e.st = a.st;
-  if (a.memo != null) e.memo = a.memo;
+  const note = a.note || a.memo || ""; // 로그 한 줄: "사용자 - 사유"
+  if (note) e.note = note;
   r.log.push(e);
   r.log.sort((x, y) => x.at - y.at);
   if (r.log.length > MAX_LOG) r.log = r.log.slice(-MAX_LOG);
