@@ -1,0 +1,13 @@
+# Netlify 설정 — 이 폴더(inspection_route)를 저장소 루트로 올리면 그대로 인식됩니다.
+[build]
+  publish = "public"              # 화면 파일 (index.html, sw.js, 아이콘)
+  functions = "netlify/functions" # 공유 기록 API (/api/records)
+
+[build.environment]
+  NODE_VERSION = "22"             # @netlify/blobs 가 Node 22 이상 필요
+
+# 서비스 워커는 항상 새로 확인해야 배포가 바로 반영됨
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"

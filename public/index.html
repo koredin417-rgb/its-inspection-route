@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>요일별 점검 동선 (카카오맵)</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1d2330">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="점검 동선">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="application-name" content="점검 동선">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f5f6f8;--panel:#fff;--fg:#1d2330;--muted:#6a7384;--line:#dfe3ea;--hover:#eef3fb;--accent:#1f5fbf;--ok:#15803d;--okbg:#e2f4e8;--bad:#d42f2f;--badbg:#fdecec;--me:#1a73e8;--font:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",sans-serif}
+@media (prefers-color-scheme:dark){:root{--bg:#12151b;--panel:#1a1e26;--fg:#e8ebf0;--muted:#9aa3b4;--line:#2b313d;--hover:#232a36;--accent:#6ea2ff;--ok:#3ccf7e;--okbg:#14301f;--bad:#ff6b6b;--badbg:#3a1c1e;color-scheme:dark}}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{font-family:var(--font);background:var(--bg);color:var(--fg);font-size:14px;overflow:hidden}
+button{font:inherit;color:inherit}
+.app{display:flex;flex-direction:column;height:100%;height:100dvh}
+
+/* 상단: 제목 · 점검자 · 메뉴 */
+.top{position:relative;z-index:30;display:flex;align-items:center;gap:8px;padding:10px 16px;padding-top:max(10px,env(safe-area-inset-top));background:var(--panel);border-bottom:1px solid var(--line)}
+.ttl{flex:1;min-width:0}
+h1{font-size:15px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+h1 .short{display:none}
+.top p{margin:2px 0 0;color:var(--muted);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.who{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border:1px solid var(--line);border-radius:999px;background:var(--bg);cursor:pointer;font-size:12.5px;white-space:nowrap;max-width:42vw;flex:none}
+.who span{overflow:hidden;text-overflow:ellipsis}
+.who.unset{color:var(--accent);border-color:var(--accent);font-weight:700}
+.sync{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:var(--bg);cursor:pointer;font-size:12px;white-space:nowrap;flex:none;font-variant-numeric:tabular-nums}
+.sync i{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.sync.ok i{background:var(--ok)}.sync.wait i{background:#e0a100}.sync.off i{background:var(--bad)}.sync.loc i{background:var(--muted)}
+.sync.off{color:var(--bad);border-color:var(--bad)}
+.modal .err{color:var(--bad);font-size:12.5px}
+.modal .err:empty{display:none}
+.iconbtn{width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--bg);cursor:pointer;font-size:18px;line-height:1;flex:none}
+.menu{position:absolute;right:12px;top:calc(100% + 4px);z-index:40;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.2);padding:6px;min-width:220px;display:grid}
+.menu[hidden]{display:none}
+.menu button{background:none;border:0;text-align:left;padding:10px 12px;border-radius:6px;cursor:pointer;font-size:13.5px}
+.menu button:hover{background:var(--hover)}
+.menu .danger{color:var(--bad)}
+.menu hr{border:0;border-top:1px solid var(--line);margin:4px 0}
+
+/* 일차 탭 */
+.tabs{display:flex;flex-wrap:wrap;gap:6px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.tab{font:inherit;font-size:12px;padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:var(--bg);color:var(--fg);cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.tab .dot{width:10px;height:10px;border-radius:50%}
+.tab.on{font-weight:700;background:var(--hover);border-color:var(--fg)}
+.tab .pg{color:var(--muted);font-weight:400;font-variant-numeric:tabular-nums}
+.tab .ts{display:none}
+
+/* 주소 목록 (접기/펼치기) */
+.sheet{flex:none;height:40%;min-height:0;display:flex;flex-direction:column;background:var(--panel);border-bottom:1px solid var(--line)}
+.sheet.closed{height:auto}
+.sheet.closed .scroll,.sheet.closed .status{display:none}
+.handle{display:flex;align-items:center;gap:10px;padding-right:16px;border-bottom:1px solid var(--line)}
+.sheet.closed .handle{border-bottom:0}
+.tgl{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:10px 0 10px 16px;border:0;background:none;cursor:pointer;text-align:left;font-weight:700;font-size:13.5px}
+.car{display:inline-block;transition:transform .15s;color:var(--muted);font-size:12px;width:12px;flex:none}
+.sheet.closed .tgl .car,.day.fold .car{transform:rotate(-90deg)}
+.tgl .lbl{flex:none;white-space:nowrap}
+.sum{min-width:0;font-weight:400;color:var(--muted);font-size:12.5px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.c-ok{color:var(--ok)}.c-bad{color:var(--bad)}
+.flt{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.scroll{overflow-y:auto;flex:1;min-height:0;overscroll-behavior:contain}
+.day{border-bottom:1px solid var(--line)}
+.dayhead{padding:10px 16px 6px;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;cursor:pointer;user-select:none}
+.dayhead b{font-size:15px}.dayhead .meta{color:var(--muted);font-size:12px;font-variant-numeric:tabular-nums}
+.prog{font-size:12px;font-variant-numeric:tabular-nums;margin-left:auto}
+.day.fold .body{display:none}
+.stops{list-style:none;margin:0;padding:0 0 8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr))}
+.stop{padding:7px 16px;display:grid;grid-template-columns:26px minmax(0,1fr);gap:8px;cursor:pointer;border-left:3px solid transparent}
+.stop:hover{background:var(--hover)}
+.stop.sel{background:var(--hover);border-left-color:var(--accent)}
+.stop.done .addr{color:var(--muted)}
+.hide-done .stop.done{display:none}
+.num{position:relative;width:22px;height:22px;border-radius:50%;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex:none}
+.stop.done .num{opacity:.6}
+.bd{position:absolute;right:-6px;top:-6px;width:14px;height:14px;border-radius:50%;font:700 9px/12px var(--font);font-style:normal;text-align:center;color:#fff;border:1px solid #fff}
+.bd.ok{background:var(--ok)}.bd.ng{background:var(--bad)}
+.addr{font-size:13px;font-weight:500;overflow-wrap:anywhere}
+.chip{display:inline-block;font-size:11px;font-weight:700;padding:0 7px;border-radius:999px;margin-left:6px;vertical-align:1px;line-height:18px}
+.chip.done{background:var(--okbg);color:var(--ok)}.chip.bad{background:var(--badbg);color:var(--bad)}
+.id{font-size:11.5px;color:var(--muted);overflow-wrap:anywhere}
+.last{font-size:11.5px;color:var(--muted);margin-top:1px;overflow-wrap:anywhere}
+.last .mm{color:var(--bad)}
+.links{display:flex;gap:10px;font-size:12px;margin-top:2px;flex-wrap:wrap}.links a{color:var(--accent);text-decoration:none}.links a:hover{text-decoration:underline}
+.leg{padding:0 16px 8px 50px;font-size:11.5px;color:var(--muted)}
+.status{padding:7px 16px;font-size:11.5px;color:var(--muted);border-top:1px solid var(--line)}
+
+/* 지도 */
+.mapwrap{position:relative;flex:1;min-height:0;isolation:isolate}
+#map{position:absolute;inset:0;z-index:0}
+.pin{position:relative;width:26px;height:26px;border-radius:50%;color:#fff;font:700 12px var(--font);display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);cursor:pointer;transition:transform .12s}
+.pin.done{opacity:.6}
+.pin.bad{box-shadow:0 0 0 3px var(--bad),0 1px 4px rgba(0,0,0,.45)}
+.pin.sel{transform:scale(1.3);opacity:1;box-shadow:0 0 0 2px #fff,0 0 0 4px #1d2330,0 2px 6px rgba(0,0,0,.5)}
+.home{white-space:nowrap;padding:3px 7px;border-radius:5px;background:#1d2330;color:#fff;font:700 11px var(--font);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45)}
+.me{position:relative;width:18px;height:18px;border-radius:50%;background:var(--me);border:3px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.15),0 1px 4px rgba(0,0,0,.4)}
+.me::after{content:"";position:absolute;inset:-10px;border-radius:50%;background:rgba(26,115,232,.3);animation:pulse 2s ease-out infinite;z-index:-1}
+@keyframes pulse{0%{transform:scale(.4);opacity:1}100%{transform:scale(1.5);opacity:0}}
+@media (prefers-reduced-motion:reduce){.me::after{animation:none;opacity:.5}}
+.legend{position:absolute;left:12px;bottom:12px;z-index:10;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:12.5px;box-shadow:0 2px 8px rgba(0,0,0,.2);line-height:1.9}
+.legend b{display:block;font-size:13px;margin-bottom:2px}
+.legend .sw{display:inline-block;width:22px;height:5px;border-radius:3px;vertical-align:middle;margin-right:8px}
+.legend .row{cursor:pointer}.legend .row:hover{text-decoration:underline}
+.legend .stl{display:flex;gap:12px;color:var(--muted);border-top:1px solid var(--line);margin-top:4px;padding-top:4px}
+.legend .stl i{position:static;display:inline-block;vertical-align:-2px;margin-right:4px}
+.locbtn{position:absolute;right:10px;bottom:30px;z-index:12;width:42px;height:42px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--fg);box-shadow:0 1px 5px rgba(0,0,0,.25);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+.locbtn.on{color:var(--me)}
+.locbtn.wait svg{animation:spin 1.2s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* 지점 정보창 */
+.card{position:absolute;z-index:15;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));max-height:calc(100% - 16px);overflow-y:auto;background:var(--panel);color:var(--fg);border:1px solid var(--line);border-radius:12px;box-shadow:0 6px 22px rgba(0,0,0,.28);padding:12px 14px;font-size:13px}
+.card[hidden]{display:none}
+.ch{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:10px;align-items:start}
+.ch .num{margin-top:2px}
+.jt{display:block;font-size:15.5px;line-height:1.35;overflow-wrap:anywhere}
+.kv{display:flex;align-items:center;gap:4px 8px;margin-top:4px;flex-wrap:wrap;font-size:12.5px}
+.cps{display:inline-flex;gap:4px}
+.kv .k{color:var(--muted)}
+.kv code{font:500 12.5px ui-monospace,Consolas,"D2Coding",monospace;font-variant-numeric:tabular-nums}
+.mini{border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:2px 8px;font-size:11.5px;cursor:pointer;white-space:nowrap}
+.mini:hover{border-color:var(--muted)}
+.x{border:0;background:none;cursor:pointer;color:var(--muted);font-size:17px;padding:0 2px;line-height:1}
+.meta2{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.55;overflow-wrap:anywhere}
+.sts{display:grid;grid-template-columns:1fr 1.25fr 1.25fr;gap:6px;margin-top:10px}
+.sts button{padding:10px 4px;border-radius:8px;border:1px solid var(--line);background:var(--bg);cursor:pointer;font-weight:700;font-size:13.5px}
+.sts .b-done{color:var(--ok)}.sts .b-bad{color:var(--bad)}
+.sts .b-none.on{background:var(--fg);border-color:var(--fg);color:var(--panel)}
+.sts .b-done.on{background:var(--ok);border-color:var(--ok);color:#fff}
+.sts .b-bad.on{background:var(--bad);border-color:var(--bad);color:#fff}
+.lastmod{margin-top:9px;font-size:12px;color:var(--muted)}
+.lastmod b{color:var(--fg)}
+.s-done{color:var(--ok);font-weight:700}.s-bad{color:var(--bad);font-weight:700}.s-none{font-weight:700}
+.memo{margin-top:8px;display:flex;gap:6px;align-items:stretch}
+.memo textarea{flex:1;min-width:0;min-height:48px;resize:vertical;font:inherit;font-size:13px;padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
+.memo textarea.need{border-color:var(--bad)}
+.memo .mini{line-height:1.3;padding:2px 9px}
+.linkbtn{background:none;border:0;color:var(--accent);cursor:pointer;padding:0;font-size:12.5px;margin-top:8px}
+details.hist{margin-top:8px;font-size:12px}
+details.hist summary{cursor:pointer;color:var(--muted)}
+.hist ol{list-style:none;margin:0;padding:4px 0 0}
+.hist li{padding:5px 0;border-top:1px dashed var(--line)}
+.hist .hm{color:var(--muted);margin-top:1px;overflow-wrap:anywhere}
+.clinks{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;padding-top:9px;border-top:1px solid var(--line);font-size:12.5px}
+.clinks a{color:var(--accent);text-decoration:none;font-weight:500}.clinks a:hover{text-decoration:underline}
+
+/* 키 입력 / 점검자 입력 / 알림 */
+.setup{position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:16px}
+.setup[hidden]{display:none}
+.setup form,.modal form{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px;max-width:440px;width:100%;display:grid;gap:10px}
+.setup h2,.modal h2{margin:0;font-size:16px}.setup p,.modal p{margin:0;font-size:12.5px;color:var(--muted);line-height:1.6}
+.setup input,.modal input{font:inherit;padding:9px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);width:100%}
+.setup button{font:inherit;padding:8px;border-radius:6px;border:0;background:#fee500;color:#191919;font-weight:700;cursor:pointer}
+.setup .err{color:#d6456b;font-size:12.5px}
+.modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+.modal[hidden]{display:none}
+.modal .row{display:flex;gap:8px;justify-content:flex-end}
+.modal .row button{padding:8px 16px;border-radius:6px;border:1px solid var(--line);background:var(--bg);cursor:pointer}
+.modal .row .pri{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.toast{position:fixed;left:50%;top:max(12px,env(safe-area-inset-top));transform:translate(-50%,-12px);opacity:0;transition:opacity .2s,transform .2s;background:#1d2330;color:#fff;padding:9px 14px;border-radius:8px;font-size:13px;z-index:60;pointer-events:none;max-width:calc(100% - 32px);box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (min-width:761px){.card{left:12px;right:auto;top:12px;bottom:auto;width:380px;max-height:calc(100% - 24px)}}
+@media (max-width:760px){
+.top{padding:8px 12px;padding-top:max(8px,env(safe-area-inset-top))}
+h1{font-size:14px}h1 .full{display:none}h1 .short{display:inline}.top p{display:none}
+.tabs{flex-wrap:nowrap;overflow-x:auto;padding:8px 12px;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}
+.tab{flex:none;white-space:nowrap}.tab .tn{display:none}.tab .ts{display:inline}
+.sheet{height:42%}.tgl{padding-left:12px}.handle{padding-right:12px}
+.legend{display:none}
+.dayhead{padding:10px 12px 6px}.stop{padding:7px 12px}.leg{padding:0 12px 8px 46px}.status{padding:7px 12px}
+.stops{grid-template-columns:minmax(0,1fr)}
+}
+</style>
+</head>
+<body>
+<div class="app">
+<header class="top">
+<div class="ttl"><h1><span class="full">국도 ITS 장애감시장치 · 요일별 점검 동선</span><span class="short">ITS 점검 동선</span></h1><p>상위국(노드) → 링 → 선번(COT→RT1→RT2…) 순서 · 번호는 방문 순서 · ⌂ 상위국 출발·복귀</p></div>
+<button class="sync wait" id="syncBtn" type="button" title="공유 상태 (눌러서 지금 동기화)"><i></i>연결 중</button>
+<button class="who" id="whoBtn" type="button" title="점검자 변경"></button>
+<button class="iconbtn" id="menuBtn" type="button" aria-label="메뉴" aria-haspopup="true">⋯</button>
+<div class="menu" id="menu" hidden>
+<button type="button" data-m="who">점검자 이름 변경</button>
+<button type="button" data-m="code">팀 코드 변경</button>
+<button type="button" data-m="csv">점검 기록 CSV 내보내기</button>
+<button type="button" data-m="reset" class="danger">새 점검 회차 시작 (기록 초기화)</button>
+<hr>
+<button type="button" data-m="key">카카오 API 키 변경</button>
+</div>
+</header>
+<div class="tabs" id="tabs"></div>
+<section class="sheet" id="sheet">
+<div class="handle">
+<button type="button" class="tgl" id="sheetBtn" aria-expanded="true" aria-controls="days"><span class="car">▾</span><span class="lbl">주소 목록</span><span class="sum" id="sum"></span></button>
+<label class="flt"><input type="checkbox" id="onlyTodo">완료 숨김</label>
+</div>
+<div class="scroll" id="days"></div>
+<div class="status"><div id="syncTxt"></div><div id="status">지도 준비 중…</div></div>
+</section>
+<div class="mapwrap">
+<div id="map"></div>
+<div class="legend" id="legend"></div>
+<button class="locbtn" id="locbtn" type="button" aria-label="내 위치" title="내 위치 (GPS)"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
+<div class="card" id="card" hidden></div>
+<div class="setup" id="setup" hidden>
+<form id="keyform">
+<h2>카카오맵 API 키 입력</h2>
+<p>카카오 개발자 사이트 → 내 애플리케이션 → 앱 키에서 확인할 수 있습니다. 입력한 키는 이 브라우저에만 저장됩니다.</p>
+<label>JavaScript 키 (지도 표시, 필수)<input id="jsKey" required autocomplete="off"></label>
+<input id="restKey" type="hidden">
+<div class="err" id="keyerr"></div>
+<button type="submit">지도 열기</button>
+</form>
+</div>
+</div>
+</div>
+<div class="modal" id="whoDlg" hidden>
+<form id="whoForm">
+<h2>점검자 이름</h2>
+<p>완료·이상있음·메모를 기록할 때 이 이름과 시간이 함께 남습니다. 이 기기에만 저장됩니다.</p>
+<input id="whoIn" maxlength="20" required placeholder="예: 홍길동" autocomplete="name">
+<div class="row"><button type="button" id="whoCancel">취소</button><button type="submit" class="pri">저장</button></div>
+</form>
+</div>
+<div class="modal" id="codeDlg" hidden>
+<form id="codeForm">
+<h2>팀 코드</h2>
+<p>팀원끼리 점검 기록을 함께 보려면 관리자에게 받은 팀 코드를 입력하세요. 이 기기에만 저장됩니다.</p>
+<input id="codeIn" maxlength="60" required autocomplete="off" placeholder="팀 코드">
+<div class="err" id="codeErr"></div>
+<div class="row"><button type="button" id="codeCancel">나중에</button><button type="submit" class="pri">확인</button></div>
+</form>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+// 키를 파일에 고정하려면 아래 두 값에 직접 넣으세요. 비워 두면 화면에서 입력받습니다.
+var KAKAO_JS_KEY = "a0e62e1b0e939cfc653a4585698aaad9";
+var KAKAO_REST_KEY = "";
+(function(){
+var DAYS=[{"d": "", "date": "", "name": "판암노드 #2링 ① COT→RT11 (대전·옥천·영동)", "color": "#2a7de1", "sub": 2, "node": "판암노드", "ring": "#2링", "base": [36.33639, 127.486779], "lead": null, "tail": [57.1, 45], "loop": [144.7, 127], "stops": [[12, "COT", "COT", "[국도04] 대전광역시 동구 세천동 562", 36.33639, 127.486779, "COT", ""], [13, "CCTV", "32004CTE40104", "[국도04] 대전광역시 동구 세천동 181-33", 36.335625, 127.484923, "RT1", "[국도04] 대전 세천동"], [14, "CCTV", "32004CTS40504", "[국도04] 충북 옥천군 군북면 증약리 1109-6", 36.33625, 127.520286, "RT2", "[국도04] 옥천 증약교"], [15, "CCTV", "32004CTS40534", "[국도04] 충북 옥천군 군북면 이백리 336", 36.33369, 127.52962, "RT3", "[국도04] 옥천 이백리(사각)"], [16, "CCTV", "32004CTS40904", "[국도04] 충북 옥천군 동이면 세산리 산 88-17", 36.268407, 127.623607, "RT4", "[국도04] 옥천 동이농공단지입구"], [17, "CCTV", "32004CTS40874", "[국도04] 충북 옥천군 동이면 세산리 33", 36.27065, 127.62016, "RT5", "[국도04] 옥천 적하3(사각)"], [18, "CCTV", "32004CTS41304", "[국도04] 충북 영동군 심천면 고당리 산 93-5", 36.218215, 127.681449, "RT6", "[국도04] 영동 심천면"], [19, "CCTV", "32004CTE41704", "[국도04] 충북 영동군 영동읍 오탄리 산 49-3", 36.190615, 127.7622, "RT7", "[국도04] 영동 오탄리"], [20, "CCTV", "32004CTS50201", "[국도04] 충북 영동군 영동읍 매천리 산37-15", 36.163688, 127.788217, "RT8", "[국도04] 영동 힐링교차로"], [21, "CCTV", "32004CTS50601", "[국도04] 충북 영동군 영동읍 가리 산52-3", 36.180248, 127.844553, "RT9", "[국도04] 영동 가리"], [22, "CCTV", "32004CTS51001", "[국도04] 충북 영동군 황간면 노근리 산34-4", 36.210008, 127.883748, "RT10", "[국도04] 영동 노근리"], [23, "CCTV", "32004CTS51401", "[국도04] 충북 영동군 황간면 광평리 산3-3", 36.222577, 127.932697, "RT11", "[국도04] 영동 광평교차로"]]}, {"d": "", "date": "", "name": "판암노드 #2링 ② RT12→RT23 (영동→옥천)", "color": "#e8833a", "sub": 2, "node": "판암노드", "ring": "#2링", "base": [36.33639, 127.486779], "lead": [55.3, 46], "tail": [4.6, 5], "loop": [135.9, 119], "stops": [[24, "CCTV", "32004CTE42502", "[국도04] 충북 영동군 황간면 광평리 21-2", 36.215868, 127.942106, "RT12", "[국도04] 영동 광평리"], [25, "CCTV", "32004CTS42702", "[국도04] 충북 영동군 추풍령면 사부리 533-3", 36.214362, 127.978942, "RT13", "[국도04] 영동 사부리교차로"], [26, "CCTV", "32004CTS51201", "[국도04] 충북 영동군 황간면 마산리 163-1", 36.220451, 127.908007, "RT14", "[국도04] 영동 마산터널"], [27, "CCTV", "32004CTS50801", "[국도04] 충북 영동군 황간면 서송원리 986-3", 36.195059, 127.863809, "RT15", "[국도04] 영동 서송원리"], [28, "CCTV", "32004CTS50401", "[국도04] 충북 영동군 영동읍 주곡리 427", 36.167207, 127.816184, "RT16", "[국도04] 영동 주곡교차로"], [29, "CCTV", "32004CTS41902", "[국도04] 충북 영동군 영동읍 부용리 4-2", 36.173275, 127.774287, "RT17", "[국도04] 영동 부용4"], [30, "CCTV", "32004CTS41502", "[국도04] 충북 영동군 심천면 약목리 764-8", 36.203633, 127.729969, "RT18", "[국도04] 영동 과적검문소"], [31, "CCTV", "32004CTE41101", "[국도21] 충북 옥천군 이원면 이원리 728-1", 36.249778, 127.633747, "RT19", "[국도04] 옥천 이원면"], [32, "VDS", "32004VDE41702", "[국도04] 충북 옥천군 이원면 건진리 산 2-1", 36.256271, 127.625548, "RT20", ""], [33, "CCTV", "32004CTE40702", "[국도04] 충북 옥천군 옥천읍 금구리 112-126", 36.298187, 127.565944, "RT21", "[국도04] 옥천역앞"], [34, "CCTV", "32037CTS10002", "[국도04] 충북 옥천군 군북면 지오리 168-2", 36.32485411, 127.5732385, "RT22", "[국도37] 옥천 옥천중앙비축창고"], [35, "CCTV", "32004CTE40302", "[국도04] 충북 옥천군 군북면 증약리 1064-3", 36.3382, 127.50824, "RT23", "[국도04] 옥천 마달령"]]}, {"d": "", "date": "", "name": "단양노드 #7링 제천·충주", "color": "#d6456b", "sub": 3, "node": "단양노드", "ring": "#7링", "base": [36.955375, 128.334485], "lead": null, "tail": [56.1, 48], "loop": [132.4, 118], "stops": [[36, "집중국", "COT", "[국도05] 충북 단양군 단양읍 현천리 산1-8", 36.955375, 128.334485, "COT", ""], [37, "CCTV", "32038CTE30604", "[국도38] 충북 제천시 봉양읍 장평리 676-4", 37.130155, 128.134554, "RT1", "[국도38] 제천 고산교차로"], [38, "CCTV", "32038CTE30504", "[국도38] 충북 제천시 봉양읍 장평리 845-7", 37.131154, 128.127703, "RT2", "[국도38] 제천 장평삼거리"], [39, "CCTV", "32038CTE30404", "[국도38] 충북 제천시 봉양읍 주포리 184-4", 37.131104, 128.11902, "RT3", "[국도38] 제천 주포2교"], [40, "CCTV", "32038CTS30304", "[국도38] 충북 제천시 봉양읍 연박리 1112-5", 37.134301, 128.105016, "RT4", "[국도38] 제천 마곡입구삼거리"], [41, "CCTV", "32038CTE30204", "[국도38] 충북 제천시 봉양읍 연박리 1190-6", 37.133205, 128.094959, "RT5", "[국도38] 제천 공전입구삼거리"], [42, "CCTV", "32038CTE30104", "[국도38] 충북 제천시 봉양읍 원박리 280-4", 37.132738, 128.088821, "RT6", "[국도38] 제천 원박사거리"], [43, "CCTV", "32038CTE30004", "[국도38] 충북 제천시 봉양읍 원박리 901-1", 37.137623, 128.076135, "RT7", "[국도38] 제천 원박교"], [44, "CCTV", "32038CTE11504", "[국도38] 충북 충주시 산척면 송강리 1141-2", 37.09094, 127.965625, "RT8", "[국도38] 충주 송강교차로"], [45, "CCTV", "32038CTE11404", "[국도38] 충북 충주시 산척면 송강리 1901-12", 37.081451, 127.954521, "RT9", "[국도38] 충주 산척사거리"]]}, {"d": "", "date": "", "name": "부여노드 #13링 부여·서천", "color": "#2e9e6b", "sub": 1, "node": "부여노드", "ring": "#13링", "base": [36.368383, 126.6111193], "lead": null, "tail": [48.1, 41], "loop": [143.6, 137], "stops": [[1, "집중국", "COT", "[국도04] 충남 부여군 부여읍 가탑리 5-5", 36.368383, 126.6111193, "COT", ""], [2, "VMS", "32029VMS50101", "[국도29] 충남 부여군 장암면 석동리 935-10", 36.247625, 126.878738, "RT1", ""], [3, "VSL", "32029VLS30201", "[국도29] 충남 부여군 장암면 석동리 936-10", 36.246509, 126.879632, "RT2", ""], [4, "VSL", "32029VLE30101", "[국도29] 충남 부여군 장암면 석동리 715-3", 36.243877, 126.882256, "RT3", ""], [5, "VMS", "32029VMS10202", "[국도29] 충남 서천군 화양면 보현리 286", 36.04869, 126.78696, "RT4", ""], [6, "VMS", "32029VME10102", "[국도29] 충남 서천군 화양면 옥포리 244-7", 36.040371, 126.783798, "RT5", ""], [7, "VMS", "32004VME55901", "[국도04] 충남 서천군 장항읍 성주리 189-2", 36.01424, 126.70876, "RT6", ""], [8, "VMS", "32004VME56001", "[국도04] 충남 서천군 마서면 송내리 470-1", 36.0246, 126.7123, "RT7", ""], [9, "VMS", "32004VMS56102", "[국도04] 충남 서천군 마서면 송내리 62-12", 36.0342, 126.7106, "RT8", ""], [10, "VMS", "32004VME56301", "[국도04] 충남 서천군 마서면 어리 14-5", 36.0567, 126.7085, "RT9", ""], [11, "VMS", "32004VMS56201", "[국도04] 충남 서천군 마서면 어리 14-5", 36.0568, 126.7083, "RT10", ""]]}, {"d": "", "date": "", "name": "내수노드 #13링 청주·진천·천안", "color": "#7a4fd1", "sub": 4, "node": "내수노드", "ring": "#13링", "base": [36.674329, 127.519111], "lead": null, "tail": [38.4, 39], "loop": [123.7, 130], "stops": [[46, "집중국", "COT", "[국도36] 충북 청주시 청원구 내수읍 국동리 119", 36.674329, 127.519111, "COT", ""], [47, "VMS", "32034VME50001", "[국도34] 충북 진천군 초평면 용기리 140", 36.78437, 127.55753, "RT1", ""], [48, "VMS", "32034VMS50101", "[국도34] 충북 진천군 초평면 용기리 1120-1", 36.78749, 127.54725, "RT2", ""], [49, "VMS", "32034VMS45301", "[국도34] 충남 천안시 서북구 입장면 신두리 201-4", 36.922752, 127.197239, "RT3", ""], [50, "집중국", "청삼PTN", "[국도01] 충남 천안시 동남구 삼룡동 333-30", 36.781046, 127.165133, "RT4", ""]]}];
+function ls(k,v){try{if(v===undefined)return localStorage.getItem(k)||"";if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v);return true}catch(e){return v===undefined?"":false}}
+var jsKey=ls("kakaoJsKey")||KAKAO_JS_KEY, restKey="";
+function $(id){return document.getElementById(id)}
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
+function p2(n){return(n<10?"0":"")+n}
+function fmt(ts,full){var d=new Date(ts);return(full?d.getFullYear()+"-":"")+p2(d.getMonth()+1)+"-"+p2(d.getDate())+"("+"일월화수목금토".charAt(d.getDay())+") "+p2(d.getHours())+":"+p2(d.getMinutes())}
+// 지번 = 주소에서 앞의 [국도NN] 표기를 뗀 부분
+function jibun(s){return s.addr.replace(/^\s*\[[^\]]*\]\s*/,"")}
+function road(s){var m=/^\s*\[([^\]]*)\]/.exec(s.addr);return m?m[1]:""}
+function coordTxt(s){return (+s.lat).toFixed(6)+", "+(+s.lng).toFixed(6)}
+function kName(s){return encodeURIComponent(jibun(s).replace(/[,\/]/g," "))}
+function kakaoTo(s){return "https://map.kakao.com/link/to/"+kName(s)+","+s.lat+","+s.lng}
+function kakaoAt(s){return "https://map.kakao.com/link/map/"+kName(s)+","+s.lat+","+s.lng}
+function kakaoSeg(a,b){return "https://map.kakao.com/link/from/"+kName(a)+","+a.lat+","+a.lng+"/to/"+kName(b)+","+b.lat+","+b.lng}
+DAYS.forEach(function(D,di){D.stops=D.stops.map(function(r,i){return{no:r[0],type:r[1],id:r[2],addr:r[3],lat:r[4],lng:r[5],seq:r[6],nm:r[7],di:di,i:i}})});
+var map=null,active=-1,cur=null,memoOpen=false,st=$("status"),card=$("card"),box=$("days"),tabs=$("tabs");
+// 날짜가 정해지면 DAYS의 d(요일)·date(날짜)를 채우면 표시됩니다.
+function dayLabel(D,di){return (di+1)+"일차"+(D.d?" · "+D.d+" "+D.date:"")}
+function loopTxt(D){return " · 상위국 출발·복귀 포함 약 "+Math.round(D.loop[0])+"km"}
+function each(fn){DAYS.forEach(function(D){D.stops.forEach(function(s){fn(s,D)})})}
+
+// ── 점검 기록: 팀 공유 서버(/api/records, Netlify) + 이 기기 캐시 ──
+// BASE = 서버에서 받은 마지막 기록, OUT = 아직 서버에 못 올린 내 기록(오프라인이면 쌓아 두었다가 연결되면 업로드)
+// 화면에 보이는 REC = BASE 위에 OUT 을 다시 적용한 것
+var API="api/records",BKEY="inspectBase.v2",OKEY="inspectOutbox.v2",POLL_MS=20000;
+var ST_TXT={"":"미점검",done:"완료",bad:"이상있음"},who=ls("inspector"),teamCode=ls("teamCode");
+function loadJ(k,d){try{return JSON.parse(ls(k))||d}catch(e){return d}}
+var BASE=loadJ(BKEY,{etag:null,records:{},resetAt:0}),OUT=loadJ(OKEY,[]),REC={};
+function sk(s){return s.no+"|"+s.id}
+function rec(s){return REC[sk(s)]||null}
+function stOf(s){var r=rec(s);return r&&r.st||""}
+function badge(v){return v==="done"?"<i class='bd ok'>✓</i>":v==="bad"?"<i class='bd ng'>!</i>":""}
+var tT;function toast(m){var t=$("toast");t.textContent=m;t.classList.add("show");clearTimeout(tT);tT=setTimeout(function(){t.classList.remove("show")},2600)}
+// 서버(netlify/functions/records.mjs)의 applyAction 과 같은 규칙: 같은 id는 한 번만, 상태·메모는 더 나중 시각이 이김, 이력은 시각순
+function applyAction(recs,a){
+  var r=recs[a.key]||(recs[a.key]={st:"",memo:"",by:"",at:0,stAt:0,memoAt:0,log:[]});
+  if(r.log.some(function(e){return e.id===a.id}))return false;
+  if(a.st!=null&&a.at>=(r.stAt||0)){r.st=a.st;r.stAt=a.at}
+  if(a.memo!=null&&a.at>=(r.memoAt||0)){r.memo=a.memo;r.memoAt=a.at}
+  if(a.at>=(r.at||0)){r.at=a.at;r.by=a.by}
+  var e={id:a.id,a:a.label,by:a.by,at:a.at};if(a.st!=null)e.st=a.st;if(a.memo!=null)e.memo=a.memo;
+  r.log.push(e);r.log.sort(function(x,y){return x.at-y.at});if(r.log.length>100)r.log=r.log.slice(-100);
+  return true;
+}
+function rebuild(){REC=JSON.parse(JSON.stringify(BASE.records||{}));OUT.forEach(function(a){if(a.at>=(BASE.resetAt||0))applyAction(REC,a)})}
+rebuild();
+function rid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,9)}
+function act(s,v,memo,label){needWho(function(){
+  var a={id:rid(),key:sk(s),st:v,memo:memo,label:label,by:who,at:Date.now()};
+  OUT.push(a);
+  toast(ls(OKEY,JSON.stringify(OUT))?label+" · "+who+" "+fmt(a.at):"⚠ 저장 실패: 이 브라우저가 저장을 막고 있습니다");
+  applyAction(REC,a);refresh(s);syncUI();flush();
+})}
+
+// ── 서버 동기화: 내 기록은 바로 업로드, 다른 사람 기록은 20초마다(화면이 켜져 있을 때) 받아옴 ──
+var SY={mode:"init",busy:false,last:0,fail:0,t:null};
+function apiHeaders(body){var h={};if(teamCode)h["x-team-code"]=encodeURIComponent(teamCode);if(body)h["content-type"]="application/json";return h}
+function call(method,body,q){
+  return fetch(API+(q||""),{method:method,headers:apiHeaders(body),body:body?JSON.stringify(body):undefined,cache:"no-store"}).then(function(r){
+    var ct=r.headers.get("content-type")||"",e;
+    if(r.status===401){e=new Error("팀 코드");e.kind="auth";throw e}
+    if(r.status===404||r.status===405||r.status===501||ct.indexOf("json")<0){e=new Error("공유 서버 없음");e.kind="local";throw e}
+    if(!r.ok){e=new Error("서버 오류 "+r.status);e.kind="server";throw e}
+    return r.json()});
+}
+function setBase(d){
+  var before=REC;
+  BASE={etag:d.etag||null,records:d.records||{},resetAt:d.resetAt||0};
+  if(BASE.resetAt){var n=OUT.length;OUT=OUT.filter(function(a){return a.at>=BASE.resetAt});if(OUT.length!==n)ls(OKEY,JSON.stringify(OUT))}
+  ls(BKEY,JSON.stringify(BASE));rebuild();showChanges(before);
+}
+// 바뀐 지점만 다시 그리고, 다른 점검자의 새 기록은 알림으로 보여줌
+function showChanges(before){
+  var remote=[];
+  each(function(s){var k=sk(s),o=before[k]||null,n=REC[k]||null;
+    if(JSON.stringify(o)===JSON.stringify(n))return;
+    refresh(s);
+    if(SY.last&&n&&n.by&&n.by!==who&&(!o||n.at>(o.at||0)))remote.push(n.by+" · "+(s.di+1)+"일차 "+(s.i+1)+"번 "+ST_TXT[n.st]);
+  });
+  if(remote.length)toast(remote.length===1?remote[0]:remote[0]+" 외 "+(remote.length-1)+"건");
+}
+function poll(){
+  if(SY.busy||SY.mode==="local"||SY.mode==="auth")return;
+  SY.busy=true;
+  call("GET",null,BASE.etag?"?since="+encodeURIComponent(BASE.etag):"").then(function(d){
+    SY.busy=false;if(!d.unchanged)setBase(d);ok();if(OUT.length)flush();
+  }).catch(fail);
+}
+function flush(){
+  if(SY.busy||!OUT.length||SY.mode==="local"||SY.mode==="auth")return;
+  SY.busy=true;var batch=OUT.slice(0,50),ids={};batch.forEach(function(a){ids[a.id]=1});
+  call("POST",{actions:batch}).then(function(d){
+    SY.busy=false;OUT=OUT.filter(function(a){return !ids[a.id]});ls(OKEY,JSON.stringify(OUT));setBase(d);ok();if(OUT.length)flush();
+  }).catch(fail);
+}
+function sync(){if(OUT.length)flush();else poll()}
+function ok(){SY.mode="shared";SY.last=Date.now();SY.fail=0;syncUI()}
+function fail(e){SY.busy=false;var k=e&&e.kind;
+  if(k==="auth"){SY.mode="auth";syncUI();askCode(!!teamCode);return}
+  if(k==="local"){SY.mode="local";syncUI();return}
+  SY.mode=k==="server"?"error":"offline";SY.fail++;syncUI();
+}
+function tick(){clearTimeout(SY.t);if(!document.hidden&&SY.mode!=="local"&&SY.mode!=="auth")sync();
+  SY.t=setTimeout(tick,SY.fail?Math.min(60000,POLL_MS*Math.pow(2,SY.fail-1)):POLL_MS)}
+function syncUI(){
+  var b=$("syncBtn"),n=OUT.length,m=SY.mode,t,c,line;
+  var last=SY.last?" · "+fmt(SY.last).slice(-5)+" 동기화":"";
+  if(m==="shared"){c=n?"wait":"ok";t=n?"올리는 중 "+n:"공유 중";line="팀 공유 저장"+last+(n?" · 올릴 기록 "+n+"건":"")}
+  else if(m==="offline"||m==="error"){c="off";t=n?"대기 "+n:"오프라인";line=(m==="error"?"공유 서버 오류":"인터넷 연결 없음")+" · 기록은 이 기기에 저장되고 연결되면 자동으로 올라갑니다"+(n?" (대기 "+n+"건)":"")}
+  else if(m==="auth"){c="off";t="팀 코드";line="팀 코드가 필요합니다 — 위의 '팀 코드' 버튼을 눌러 입력하세요"}
+  else if(m==="local"){c="loc";t="이 기기만";line="공유 서버가 없어 이 기기에만 저장됩니다"+(n?" ("+n+"건)":"")}
+  else{c="wait";t="연결 중";line="공유 서버 연결 중…"}
+  b.className="sync "+c;b.innerHTML="<i></i>"+t;b.title=line;$("syncTxt").textContent=line;
+}
+document.addEventListener("visibilitychange",function(){if(!document.hidden)tick()});
+window.addEventListener("online",function(){if(SY.mode==="offline"||SY.mode==="error")SY.mode="init";SY.fail=0;tick()});
+
+// ── 점검자 ──
+var whoCb=null;
+function renderWho(){var b=$("whoBtn");b.innerHTML="<svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2.2'><circle cx='12' cy='8' r='4'/><path d='M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7'/></svg><span>"+esc(who||"점검자 설정")+"</span>";b.classList.toggle("unset",!who)}
+function askWho(cb){whoCb=cb||null;$("whoIn").value=who;$("whoDlg").hidden=false;setTimeout(function(){$("whoIn").focus()},30)}
+function needWho(cb){if(who)cb();else askWho(cb)}
+$("whoForm").onsubmit=function(e){e.preventDefault();var v=$("whoIn").value.trim();if(!v)return;who=v;ls("inspector",v);renderWho();$("whoDlg").hidden=true;var cb=whoCb;whoCb=null;if(cb)cb();else toast("점검자: "+v)};
+$("whoCancel").onclick=function(){$("whoDlg").hidden=true;whoCb=null};
+$("whoBtn").onclick=function(){askWho()};
+
+// ── 현재 위치 (GPS) ──
+var me={pos:null,watch:null,ov:null,circle:null,center:false},locbtn=$("locbtn");
+function distKm(a,b){var R=6371,r=Math.PI/180,x=Math.sin((b.lat-a.lat)*r/2),y=Math.sin((b.lng-a.lng)*r/2);return 2*R*Math.asin(Math.sqrt(x*x+Math.cos(a.lat*r)*Math.cos(b.lat*r)*y*y))}
+function kmTxt(d){return d<1?Math.round(d*1000)+"m":(d<10?d.toFixed(1):Math.round(d))+"km"}
+function distTxt(s){return me.pos?" · 현위치에서 "+kmTxt(distKm(me.pos,s)):""}
+function startGps(center){
+  if(!navigator.geolocation){toast("이 기기/브라우저는 위치 기능을 지원하지 않습니다");return}
+  if(!window.isSecureContext){toast("위치는 https 주소에서만 사용할 수 있습니다");return}
+  me.center=center;
+  if(me.watch!==null){if(me.pos&&center){me.center=false;centerMe()}return}
+  locbtn.classList.add("wait");
+  me.watch=navigator.geolocation.watchPosition(onPos,onPosErr,{enableHighAccuracy:true,maximumAge:10000,timeout:30000});
+}
+function onPos(p){me.pos={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy||0};
+  locbtn.classList.remove("wait");locbtn.classList.add("on");drawMe();updDist();
+  if(me.center){me.center=false;centerMe()}}
+function onPosErr(e){locbtn.classList.remove("wait");
+  if(e.code===1){navigator.geolocation.clearWatch(me.watch);me.watch=null;locbtn.classList.remove("on");toast("위치 권한이 꺼져 있습니다 — 브라우저/휴대폰 설정에서 위치를 허용해 주세요")}
+  else if(!me.pos)toast(e.code===3?"위치 확인 시간 초과 — 잠시 후 다시 눌러 주세요":"현재 위치를 확인할 수 없습니다")}
+function drawMe(){if(!map||!me.pos)return;var C=kakao.maps,ll=new C.LatLng(me.pos.lat,me.pos.lng),r=Math.min(me.pos.acc,3000);
+  if(!me.ov){var el=document.createElement("div");el.className="me";el.title="내 위치";
+    me.ov=new C.CustomOverlay({position:ll,content:el,zIndex:25,clickable:true});me.ov.setMap(map);
+    me.circle=new C.Circle({center:ll,radius:r,strokeWeight:1,strokeColor:"#1a73e8",strokeOpacity:.5,fillColor:"#1a73e8",fillOpacity:.1});me.circle.setMap(map)}
+  else{me.ov.setPosition(ll);me.circle.setPosition(ll);me.circle.setRadius(r)}}
+function centerMe(){if(!map||!me.pos)return;if(map.getLevel()>5)map.setLevel(5);map.panTo(new kakao.maps.LatLng(me.pos.lat,me.pos.lng))}
+function updDist(){each(function(s){var e=$("d"+s.di+"_"+s.i);if(e)e.textContent=distTxt(s)});if(cur){var c=$("cdist");if(c)c.textContent=distTxt(DAYS[cur.di].stops[cur.i])}}
+locbtn.onclick=function(){startGps(true)};
+
+// ── 목록 / 탭 / 범례 (지도와 무관하게 먼저 그림) ──
+function rowHtml(D,s){var i=s.i,r=rec(s),v=r&&r.st||"",prev=i?D.stops[i-1]:null;
+  return "<span class='num' style='background:"+D.color+"'>"+(i+1)+badge(v)+"</span><div>"
+  +"<div class='addr'>"+esc(jibun(s))+(v?"<span class='chip "+v+"'>"+ST_TXT[v]+"</span>":"")+"</div>"
+  +"<div class='id'>선번 "+esc(s.seq)+" · "+esc(s.type)+" · "+esc(s.id)+(s.nm?" · "+esc(s.nm):"")+" · 순번 "+s.no+"<span id='d"+s.di+"_"+i+"'>"+distTxt(s)+"</span></div>"
+  +(r&&r.by?"<div class='last'>"+esc(r.by)+" · "+fmt(r.at)+(r.memo?" · <span"+(v==="bad"?" class='mm'":"")+">"+esc(r.memo)+"</span>":"")+"</div>":"")
+  +"<div class='links'>"+(prev?"<a href='"+kakaoSeg(prev,s)+"' target='_blank' rel='noopener'>"+i+"번→"+(i+1)+"번 길찾기</a>":"")+"<a href='"+kakaoTo(s)+"' target='_blank' rel='noopener'>현위치→여기</a></div></div>"}
+DAYS.forEach(function(D,di){
+  var sec=document.createElement("section");sec.className="day";sec.dataset.i=di;
+  var h="<div class='dayhead' role='button' tabindex='0' aria-expanded='true'><span class='car'>▾</span><b style='color:"+D.color+"'>"+dayLabel(D,di)+"</b><span>"+esc(D.name)+"</span><span class='meta' id='m"+di+"'>"+D.stops.length+"개 지점"+loopTxt(D)+"</span><span class='prog' id='p"+di+"'></span></div>"
+    +"<div class='body'>"+(D.lead?"<div class='leg'>⌂ "+esc(D.node)+"(상위국) 출발 → 1번까지 이동 약 "+Math.round(D.lead[0])+"km</div>":"")+"<ol class='stops'>";
+  D.stops.forEach(function(s,i){var v=stOf(s);h+="<li class='stop"+(v?" "+v:"")+"' id='r"+di+"_"+i+"' data-i='"+i+"'>"+rowHtml(D,s)+"</li>"});
+  sec.innerHTML=h+"</ol><div class='leg'>⌂ "+D.stops.length+"번 → "+esc(D.node)+"(상위국) 복귀 약 "+Math.round(D.tail[0])+"km</div></div>";
+  var hd=sec.querySelector(".dayhead");
+  function fold(){var f=sec.classList.toggle("fold");hd.setAttribute("aria-expanded",String(!f))}
+  hd.addEventListener("click",fold);hd.addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();fold()}});
+  sec.querySelector(".stops").addEventListener("click",function(e){var li=e.target.closest(".stop");if(!li||e.target.closest("a"))return;
+    if(active!==-1&&active!==di)show(di);openCard(di,+li.dataset.i,"zoom")});
+  box.appendChild(sec);
+});
+function tab(label,color,i){var b=document.createElement("button");b.type="button";b.className="tab";b.dataset.i=i;b.innerHTML=(color?"<span class='dot' style='background:"+color+"'></span>":"")+label+"<span class='pg'></span>";b.onclick=function(){show(i)};tabs.appendChild(b)}
+tab("전체",null,-1);DAYS.forEach(function(D,i){
+  var short=D.node.replace("노드","")+((D.name.match(/[①②③④⑤]/)||[""])[0]);
+  tab(dayLabel(D,i)+"<span class='tn'> · "+esc(D.name)+"</span><span class='ts'> "+esc(short)+"</span>",D.color,i)});
+var lg=$("legend"),lh="<b>일차별 색상</b>";
+DAYS.forEach(function(D,i){lh+="<div class='row' data-i='"+i+"'><span class='sw' style='background:"+D.color+"'></span>"+dayLabel(D,i)+" · "+esc(D.name)+"</div>"});
+lg.innerHTML=lh+"<div class='row' data-i='-1' style='color:var(--muted)'>전체 보기</div><div class='stl'><span><i class='bd ok'>✓</i>완료</span><span><i class='bd ng'>!</i>이상있음</span></div>";
+lg.querySelectorAll(".row").forEach(function(r){r.onclick=function(){show(+r.dataset.i)}});
+function cnt(D){var c={done:0,bad:0,n:D.stops.length};D.stops.forEach(function(s){var v=stOf(s);if(v)c[v]++});return c}
+function progress(){var T={done:0,bad:0,n:0},A={done:0,n:0};
+  DAYS.forEach(function(D,di){var c=cnt(D);
+    $("p"+di).innerHTML="<span class='c-ok'>완료 "+c.done+"</span>"+(c.bad?" · <span class='c-bad'>이상 "+c.bad+"</span>":"")+" / "+c.n;
+    var pg=tabs.querySelector(".tab[data-i='"+di+"'] .pg");if(pg)pg.textContent=" "+c.done+"/"+c.n;
+    A.done+=c.done;A.n+=c.n;
+    if(active===-1||active===di){T.done+=c.done;T.bad+=c.bad;T.n+=c.n}});
+  tabs.querySelector(".tab[data-i='-1'] .pg").textContent=" "+A.done+"/"+A.n;
+  $("sum").innerHTML=" · "+T.n+"곳 · <span class='c-ok'>완료 "+T.done+"</span>"+(T.bad?" · <span class='c-bad'>이상 "+T.bad+"</span>":"")+" · 남음 "+(T.n-T.done-T.bad);
+}
+function refresh(s){var D=DAYS[s.di],li=$("r"+s.di+"_"+s.i),v=stOf(s),sel=!!cur&&cur.di===s.di&&cur.i===s.i;
+  if(li){li.className="stop"+(v?" "+v:"")+(sel?" sel":"");li.innerHTML=rowHtml(D,s)}
+  if(map)pinState(D,s.i);
+  progress();if(sel)renderCard()}
+
+// 주소 목록 접기/펼치기, 완료 숨기기
+// auto: 휴대폰에서 정보창을 열 때 잠시 접은 것 (정보창을 닫으면 다시 펼침, 설정에는 저장 안 함)
+var sheet=$("sheet"),autoClosed=false,fitMap=function(){};
+function setSheet(open,auto){sheet.classList.toggle("closed",!open);$("sheetBtn").setAttribute("aria-expanded",String(open));
+  autoClosed=!!auto&&!open;if(!auto)ls("sheetOpen",open?"1":"0");fitMap()}
+$("sheetBtn").onclick=function(){setSheet(sheet.classList.contains("closed"))};
+setSheet(ls("sheetOpen")!=="0");
+var onlyTodo=$("onlyTodo");onlyTodo.checked=ls("hideDone")==="1";box.classList.toggle("hide-done",onlyTodo.checked);
+onlyTodo.onchange=function(){box.classList.toggle("hide-done",onlyTodo.checked);ls("hideDone",onlyTodo.checked?"1":"0")};
+
+function show(i){
+  active=i;
+  document.querySelectorAll(".tab").forEach(function(b){b.classList.toggle("on",+b.dataset.i===i)});
+  document.querySelectorAll(".day").forEach(function(s){s.style.display=(i===-1||+s.dataset.i===i)?"":"none"});
+  if(cur&&i!==-1&&cur.di!==i)closeCard();
+  progress();
+  if(!map)return;
+  var b=new kakao.maps.LatLngBounds();
+  DAYS.forEach(function(D){D.home.setMap(null)});
+  DAYS.forEach(function(D,k){var on=i===-1||k===i;
+    D.line.setMap(on?map:null);D.pins.forEach(function(p){p.setMap(on?map:null)});
+    if(on){D.home.setMap(map);b.extend(new kakao.maps.LatLng(D.base[0],D.base[1]));D.stops.forEach(function(s){b.extend(new kakao.maps.LatLng(s.lat,s.lng))});}});
+  map.setBounds(b,40,40,40,40);
+}
+
+// ── 지점 정보창 ──
+function openCard(di,i,mode){
+  var old=cur;cur={di:di,i:i};memoOpen=false;
+  if(old){var o=$("r"+old.di+"_"+old.i);if(o)o.classList.remove("sel");if(map)pinState(DAYS[old.di],old.i)}
+  var li=$("r"+di+"_"+i);if(li)li.classList.add("sel");
+  if(mobile()&&!sheet.classList.contains("closed"))setSheet(false,true);
+  renderCard(true);
+  if(!map)return;
+  var s=DAYS[di].stops[i];pinState(DAYS[di],i);
+  if(mode==="zoom")focusStop(s,true);else if(mode==="ifcovered"&&covered(s))focusStop(s,false);
+}
+function closeCard(){if(!cur)return;var p=cur;cur=null;memoOpen=false;card.hidden=true;
+  var li=$("r"+p.di+"_"+p.i);if(li)li.classList.remove("sel");if(map)pinState(DAYS[p.di],p.i);
+  if(autoClosed){setSheet(true,true);if(li)li.scrollIntoView({block:"nearest"});var s=DAYS[p.di].stops[p.i];if(map)map.setCenter(new kakao.maps.LatLng(s.lat,s.lng))}placeLoc()}
+function mobile(){return innerWidth<=760}
+function covered(s){if(card.hidden||!mobile())return false;var p=map.getProjection().containerPointFromCoords(new kakao.maps.LatLng(s.lat,s.lng));return p.y>$("map").offsetHeight-card.offsetHeight-24}
+// 휴대폰에서는 정보창이 지도 아래쪽을 가리므로 지점이 정보창 위로 오게 이동
+function focusStop(s,zoom){var C=kakao.maps,ll=new C.LatLng(s.lat,s.lng);if(zoom&&map.getLevel()>6)map.setLevel(6);
+  var off=(!card.hidden&&mobile())?Math.round(card.offsetHeight/2):0;
+  if(off){var pr=map.getProjection(),p=pr.containerPointFromCoords(ll);ll=pr.coordsFromContainerPoint(new C.Point(p.x,p.y+off))}
+  map.panTo(ll)}
+function placeLoc(){var h=card.offsetHeight,mh=$("map").offsetHeight;
+  if(!card.hidden&&mobile()){locbtn.style.bottom=(h+16)+"px";locbtn.style.display=h+70>mh?"none":""}else{locbtn.style.bottom="";locbtn.style.display=""}}
+function renderCard(fresh){
+  if(!cur){card.hidden=true;placeLoc();return}
+  var ta=$("memoIn"),draft=(!fresh&&ta)?ta.value:null,hd=card.querySelector("details.hist"),histOpen=!fresh&&!!hd&&hd.open,sc=fresh?0:card.scrollTop;
+  var D=DAYS[cur.di],s=D.stops[cur.i],r=rec(s),v=r&&r.st||"",prev=cur.i?D.stops[cur.i-1]:null,rd=road(s),saved=r&&r.memo||"";
+  var showMemo=memoOpen||v==="bad"||!!saved||!!draft;
+  var h="<div class='ch'><span class='num' style='background:"+D.color+"'>"+(cur.i+1)+"</span><div>"
+    +"<b class='jt'>"+esc(jibun(s))+"</b>"
+    +"<div class='kv'><span class='k'>좌표</span><code>"+coordTxt(s)+"</code><span class='cps'><button type='button' class='mini' data-a='cpc'>좌표 복사</button><button type='button' class='mini' data-a='cpj'>지번 복사</button></span></div>"
+    +"</div><button type='button' class='x' data-a='close' aria-label='닫기'>✕</button></div>"
+    +"<div class='meta2'>"+dayLabel(D,cur.di)+" "+(cur.i+1)+"번째 · "+esc(D.node)+" "+esc(D.ring)+" · 선번 "+esc(s.seq)+" · "+esc(s.type)+" "+esc(s.id)+(s.nm?" · "+esc(s.nm):"")+(rd&&s.nm.indexOf(rd)<0?" · "+esc(rd):"")+"<span id='cdist'>"+distTxt(s)+"</span></div>"
+    +"<div class='sts' role='group' aria-label='점검 상태'>"
+    +"<button type='button' class='b-none"+(v===""?" on":"")+"' data-a='st' data-v=''>미점검</button>"
+    +"<button type='button' class='b-done"+(v==="done"?" on":"")+"' data-a='st' data-v='done'>✓ 완료</button>"
+    +"<button type='button' class='b-bad"+(v==="bad"?" on":"")+"' data-a='st' data-v='bad'>⚠ 이상있음</button></div>"
+    +"<div class='lastmod'>"+(r&&r.by?"최종 수정 <b>"+esc(r.by)+"</b> · "+fmt(r.at,true)+" · <span class='s-"+(v||"none")+"'>"+ST_TXT[v]+"</span>":"아직 점검 기록 없음")+"</div>";
+  if(showMemo){var val=draft!==null?draft:saved;
+    h+="<div class='memo'><textarea id='memoIn' rows='2' class='"+(v==="bad"&&!val?"need":"")+"' placeholder='"+(v==="bad"?"이상 내용을 적어 주세요 (예: 영상 끊김, 함체 파손, 전원 불량)":"특이사항 메모")+"'>"+esc(val)+"</textarea><button type='button' class='mini' data-a='memo'>메모<br>저장</button></div>"}
+  else h+="<button type='button' class='linkbtn' data-a='openmemo'>+ 메모 추가</button>";
+  if(r&&r.log&&r.log.length)h+="<details class='hist'"+(histOpen?" open":"")+"><summary>수정 이력 "+r.log.length+"건</summary><ol>"
+    +r.log.slice().reverse().map(function(e){return "<li><b>"+esc(e.by)+"</b> · "+fmt(e.at,true)+" · <span class='s-"+(e.st||"none")+"'>"+esc(e.a)+"</span>"+(e.memo?"<div class='hm'>“"+esc(e.memo)+"”</div>":"")+"</li>"}).join("")+"</ol></details>";
+  h+="<div class='clinks'><a href='"+kakaoTo(s)+"' target='_blank' rel='noopener'>카카오맵 길안내</a>"+(prev?"<a href='"+kakaoSeg(prev,s)+"' target='_blank' rel='noopener'>"+cur.i+"번→"+(cur.i+1)+"번 길찾기</a>":"")+"<a href='"+kakaoAt(s)+"' target='_blank' rel='noopener'>카카오맵에서 보기</a></div>";
+  card.innerHTML=h;card.hidden=false;card.scrollTop=sc;placeLoc();
+}
+function copy(t,msg){function fb(){var a=document.createElement("textarea");a.value=t;a.style.position="fixed";a.style.opacity="0";document.body.appendChild(a);a.select();try{document.execCommand("copy");toast(msg)}catch(e){toast(t)}a.remove()}
+  if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(t).then(function(){toast(msg)},fb);else fb()}
+card.addEventListener("click",function(e){var b=e.target.closest("[data-a]");if(!b||!cur)return;var s=DAYS[cur.di].stops[cur.i],a=b.dataset.a,saved=(rec(s)||{}).memo||"",t=$("memoIn");
+  if(a==="close")closeCard();
+  else if(a==="cpj")copy(jibun(s),"지번을 복사했습니다");
+  else if(a==="cpc")copy(coordTxt(s),"좌표를 복사했습니다");
+  else if(a==="openmemo"){memoOpen=true;renderCard();if($("memoIn"))$("memoIn").focus()}
+  else if(a==="memo"){var m=t?t.value.trim():"";if(m===saved){toast("바뀐 내용이 없습니다");return}act(s,null,m,"메모 수정")}
+  else if(a==="st"){var v=b.dataset.v;if(v===stOf(s)){toast("이미 '"+ST_TXT[v]+"' 상태입니다");return}
+    var m2=t?t.value.trim():null;if(m2===saved)m2=null;if(v==="bad")memoOpen=true;
+    act(s,v,m2,(v==="done"?"완료":v==="bad"?"이상있음":"미점검으로 되돌림")+(m2!==null?" · 메모 수정":""))}
+});
+
+// ── 메뉴: 점검자 / CSV / 초기화 / 키 ──
+var menu=$("menu");
+$("menuBtn").onclick=function(e){e.stopPropagation();menu.hidden=!menu.hidden};
+document.addEventListener("click",function(e){if(!menu.hidden&&!e.target.closest("#menu"))menu.hidden=true});
+menu.onclick=function(e){var b=e.target.closest("[data-m]");if(!b)return;menu.hidden=true;var m=b.dataset.m;
+  if(m==="who")askWho();else if(m==="code")askCode(false);else if(m==="csv")exportCsv();else if(m==="reset")resetAll();else if(m==="key")askKey()};
+document.addEventListener("keydown",function(e){if(e.key!=="Escape")return;if(!$("whoDlg").hidden){$("whoDlg").hidden=true;whoCb=null}else if(!$("codeDlg").hidden)$("codeDlg").hidden=true;else if(!menu.hidden)menu.hidden=true;else closeCard()});
+// 팀 코드 (Netlify 환경 변수 TEAM_CODE 와 같아야 공유 기록을 읽고 쓸 수 있음)
+function askCode(wrong){$("codeIn").value=teamCode;$("codeErr").textContent=wrong?"팀 코드가 맞지 않습니다. 다시 확인해 주세요.":"";$("codeDlg").hidden=false;setTimeout(function(){$("codeIn").focus()},30)}
+$("codeForm").onsubmit=function(e){e.preventDefault();var v=$("codeIn").value.trim();if(!v)return;teamCode=v;ls("teamCode",v);$("codeDlg").hidden=true;SY.mode="init";SY.fail=0;syncUI();tick()};
+$("codeCancel").onclick=function(){$("codeDlg").hidden=true};
+$("syncBtn").onclick=function(){if(SY.mode==="auth"){askCode(false);return}if(SY.mode==="local"){toast("공유 서버가 없어 이 기기에만 저장됩니다");return}
+  if(SY.mode!=="shared"){SY.mode="init";SY.fail=0}toast("동기화 중…");tick()};
+function csvCell(v){v=String(v==null?"":v);return /[",\r\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}
+function exportCsv(){
+  var rows=[["일차","상위국","링","방문순서","선번","순번","종류","ID","명칭","지번","위도","경도","상태","메모","최종 수정자","최종 수정 시각","수정 이력"]];
+  DAYS.forEach(function(D,di){D.stops.forEach(function(s,i){var r=rec(s)||{};
+    rows.push([dayLabel(D,di),D.node,D.ring,i+1,s.seq,s.no,s.type,s.id,s.nm,jibun(s),s.lat,s.lng,ST_TXT[r.st||""],r.memo||"",r.by||"",r.at?fmt(r.at,true):"",
+      (r.log||[]).map(function(e){return fmt(e.at,true)+" "+e.by+" "+e.a+(e.memo?" ("+e.memo+")":"")}).join(" | ")])})});
+  var csv="﻿"+rows.map(function(r){return r.map(csvCell).join(",")}).join("\r\n"),d=new Date();
+  var name="점검기록_"+d.getFullYear()+p2(d.getMonth()+1)+p2(d.getDate())+"_"+p2(d.getHours())+p2(d.getMinutes())+".csv";
+  var blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+  try{var f=new File([blob],name,{type:"text/csv"});if(/Android|iPhone|iPad/i.test(navigator.userAgent)&&navigator.canShare&&navigator.canShare({files:[f]})){navigator.share({files:[f],title:name}).catch(function(){});return}}catch(e){}
+  var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},1500);toast("CSV 저장: "+name)}
+// 새 점검 회차: 공유 중이면 모든 점검자의 기록이 비워짐(서버에 이전 기록 보관본이 남음)
+function resetAll(){if(!Object.keys(REC).length){toast("지울 기록이 없습니다");return}
+  if(SY.mode==="local"){
+    if(!confirm("이 기기의 점검 상태·메모·이력을 모두 지웁니다.\n되돌릴 수 없으니 먼저 CSV로 내보내 두세요.\n\n계속할까요?"))return;
+    var b0=REC;OUT=[];BASE={etag:null,records:{},resetAt:Date.now()};ls(OKEY,"[]");ls(BKEY,JSON.stringify(BASE));rebuild();showChanges(b0);if(cur)renderCard(true);toast("점검 기록을 초기화했습니다");return}
+  if(SY.mode!=="shared"){toast("공유 서버에 연결된 상태에서만 새 회차를 시작할 수 있습니다");return}
+  if(!confirm("새 점검 회차를 시작합니다.\n모든 점검자 화면에서 점검 상태·메모·이력이 비워집니다.\n(서버에 이전 기록 보관본이 남지만, 먼저 CSV로 내보내 두는 것을 권장합니다)\n\n계속할까요?"))return;
+  needWho(function(){call("POST",{op:"reset",by:who}).then(function(d){setBase(d);ok();if(cur)renderCard(true);toast("새 점검 회차를 시작했습니다")})
+    .catch(function(e){fail(e);toast("초기화 실패: 공유 서버에 연결되지 않습니다")})});
+}
+// 같은 기기의 다른 탭과 맞춤
+window.addEventListener("storage",function(e){if(e.key!==BKEY&&e.key!==OKEY)return;
+  var b0=REC;BASE=loadJ(BKEY,{etag:null,records:{},resetAt:0});OUT=loadJ(OKEY,[]);rebuild();showChanges(b0);syncUI()});
+
+// ── 지도 ──
+function pinState(D,i){if(!D.pinEls)return;var s=D.stops[i],v=stOf(s),el=D.pinEls[i],sel=!!cur&&cur.di===s.di&&cur.i===i;
+  el.className="pin"+(v?" "+v:"")+(sel?" sel":"");el.innerHTML=(i+1)+badge(v);
+  D.pins[i].setZIndex(sel?30:v==="bad"?12:10)}
+function init(){
+  var C=kakao.maps;
+  map=new C.Map($("map"),{center:new C.LatLng(36.5,127.6),level:11});
+  map.addControl(new C.MapTypeControl(),C.ControlPosition.TOPRIGHT);
+  map.addControl(new C.ZoomControl(),C.ControlPosition.RIGHT);
+  var homes={};
+  DAYS.forEach(function(D){
+    if(!homes[D.node]){var el=document.createElement("div");el.className="home";el.textContent="⌂ "+D.node+" (상위국)";
+      homes[D.node]=new C.CustomOverlay({position:new C.LatLng(D.base[0],D.base[1]),content:el,yAnchor:1.7,zIndex:11});}
+    D.home=homes[D.node];
+  });
+  DAYS.forEach(function(D,di){
+    var path=D.stops.map(function(s){return new C.LatLng(s.lat,s.lng)});
+    D.line=new C.Polyline({path:path,strokeWeight:3,strokeColor:D.color,strokeOpacity:.7,strokeStyle:"shortdash"});
+    D.pinEls=[];
+    D.pins=D.stops.map(function(s,i){
+      var el=document.createElement("div");el.style.background=D.color;
+      el.title=dayLabel(D,di)+" "+(i+1)+". "+jibun(s)+" ("+s.seq+" "+s.type+")";
+      el.onclick=function(){openCard(di,i,"ifcovered")};
+      D.pinEls[i]=el;
+      return new C.CustomOverlay({position:new C.LatLng(s.lat,s.lng),content:el,yAnchor:.5,zIndex:10,clickable:true});
+    });
+    D.stops.forEach(function(s,i){pinState(D,i)});
+  });
+  C.event.addListener(map,"click",function(){closeCard()});
+  // 지도 영역 크기가 바뀌면(목록 접기/펼치기, 화면 회전 등) 다시 맞춤. 처음에 크기가 0이었다면 범위도 다시 맞춤.
+  var mapEl=$("map"),lastW=mapEl.offsetWidth,lastH=mapEl.offsetHeight;
+  fitMap=function(){var w=mapEl.offsetWidth,h=mapEl.offsetHeight;if(w===lastW&&h===lastH)return;var first=!lastH,c=map.getCenter();lastW=w;lastH=h;map.relayout();map.setCenter(c);if(first&&h)show(active);placeLoc()};
+  if(window.ResizeObserver)new ResizeObserver(function(){fitMap()}).observe(mapEl);else window.addEventListener("resize",fitMap);
+  show(active);
+  if(cur)openCard(cur.di,cur.i,"zoom");
+  drawMe();
+  loadRoutes();
+}
+function setRoute(D,di,coords,dist,dur,src){
+  D.line.setPath(coords.map(function(p){return new kakao.maps.LatLng(p[0],p[1])}));
+  D.line.setOptions({strokeStyle:"solid",strokeWeight:5,strokeOpacity:.85});
+  $("m"+di).textContent=D.stops.length+"개 지점 · 1번→마지막 약 "+Math.round(dist/1000)+"km · 운전 "+Math.floor(dur/3600)+"시간 "+Math.round(dur%3600/60)+"분"+loopTxt(D);
+  D.src=src;
+}
+function kakaoRoute(D){
+  var S=D.stops,body={origin:{x:S[0].lng,y:S[0].lat},destination:{x:S[S.length-1].lng,y:S[S.length-1].lat},waypoints:S.slice(1,-1).map(function(s,i){return{name:"p"+i,x:s.lng,y:s.lat}}),priority:"RECOMMEND"};
+  return fetch("https://apis-navi.kakaomobility.com/v1/waypoints/directions",{method:"POST",headers:{"Authorization":"KakaoAK "+restKey,"Content-Type":"application/json"},body:JSON.stringify(body)})
+  .then(function(r){return r.json()}).then(function(j){
+    var R=j.routes&&j.routes[0];if(!R||R.result_code!==0)throw 0;var pts=[];
+    R.sections.forEach(function(sec){sec.roads.forEach(function(rd){for(var k=0;k<rd.vertexes.length;k+=2)pts.push([rd.vertexes[k+1],rd.vertexes[k]])})});
+    return{pts:pts,dist:R.summary.distance,dur:R.summary.duration,src:"카카오모빌리티"};});
+}
+function osrmRoute(D){
+  var c=D.stops.map(function(s){return[s.lng,s.lat]});
+  return fetch("https://router.project-osrm.org/route/v1/driving/"+c.map(function(p){return p.join(",")}).join(";")+"?overview=full&geometries=geojson")
+  .then(function(r){return r.json()}).then(function(j){var R=j.routes&&j.routes[0];if(!R)throw 0;
+    return{pts:R.geometry.coordinates.map(function(p){return[p[1],p[0]]}),dist:R.distance,dur:R.duration,src:"OSRM"};});
+}
+function loadRoutes(){
+  st.textContent="도로 경로 불러오는 중…";var done=0,res=[];
+  DAYS.forEach(function(D,di){
+    (restKey?kakaoRoute(D).catch(function(){return osrmRoute(D)}):osrmRoute(D))
+    .then(function(r){setRoute(D,di,r.pts,r.dist,r.dur,r.src);res.push(r.src)}).catch(function(){})
+    .then(function(){if(++done<DAYS.length)return;
+      if(!res.length)st.textContent="도로 경로를 불러오지 못해 직선(점선)으로 표시됨";
+      else st.textContent="도로 경로: "+res.filter(function(v,i,a){return a.indexOf(v)===i}).join(", ")+" 기준"+(res.length<DAYS.length?" ("+res.length+"/"+DAYS.length+"일, 나머지는 직선)":"")+" · 시간은 참고용";});
+  });
+}
+function askKey(msg){
+  var s=$("setup");s.hidden=false;$("keyerr").textContent=msg||"";s.querySelector("h2").textContent=msg?"지도를 불러오지 못했습니다 — 카카오 도메인 등록 필요":"카카오맵 API 키 입력";if(msg)$("keyerr").innerHTML=esc(msg)+"<br><br>카카오 개발자 사이트 → 플랫폼 키 → JavaScript 키 → JavaScript SDK 도메인에 <b>"+esc(location.origin)+"</b> 을(를) 그대로 등록하고 몇 분 뒤 새로고침하세요. 키는 다시 입력할 필요 없습니다.";
+  $("jsKey").value=jsKey;$("restKey").value=restKey;st.textContent="카카오맵 API 키가 필요합니다";
+}
+$("keyform").onsubmit=function(e){e.preventDefault();
+  ls("kakaoJsKey",$("jsKey").value.trim());ls("kakaoRestKey",$("restKey").value.trim());location.reload();};
+renderWho();
+show(-1);
+syncUI();tick();
+// 위치 권한을 이미 허용했다면 바로 내 위치 표시 시작 (처음엔 ◎ 버튼을 눌러 허용)
+if(navigator.permissions&&navigator.permissions.query)navigator.permissions.query({name:"geolocation"}).then(function(p){if(p.state==="granted")startGps(false)}).catch(function(){});
+// 휴대폰 홈 화면 앱(PWA): 페이지를 저장해 두어 인터넷이 없을 때도 목록은 열리게 함
+if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost"))navigator.serviceWorker.register("sw.js").catch(function(){});
+function offlineMsg(){if(navigator.onLine!==false)return false;st.textContent="오프라인: 목록만 표시 중 · 지도는 인터넷 연결되면 자동으로 다시 불러옵니다";return true}
+window.addEventListener("online",function(){if(!map)location.reload()});
+if(!jsKey){askKey();return}
+var sc=document.createElement("script");
+sc.src="https://dapi.kakao.com/v2/maps/sdk.js?appkey="+encodeURIComponent(jsKey)+"&autoload=false";
+sc.onload=function(){if(!window.kakao||!kakao.maps){askKey("지도 SDK를 불러오지 못했습니다.");return}kakao.maps.load(init)};
+sc.onerror=function(){if(offlineMsg())return;askKey("지도를 불러오지 못했습니다. 키가 맞는지, 이 주소("+location.origin+")가 카카오 앱의 Web 플랫폼 도메인에 등록돼 있는지 확인해 주세요.")};
+document.head.appendChild(sc);
+setTimeout(function(){if(!map&&$("setup").hidden&&!offlineMsg())askKey("지도가 응답하지 않습니다. 키와 등록 도메인("+location.origin+"), 카카오맵 사용 설정(ON)을 확인해 주세요.")},8000);
+})();
+</script>
+</body>
+</html>

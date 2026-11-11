@@ -1,0 +1,9 @@
+{
+  "name": "inspection-route",
+  "private": true,
+  "type": "module",
+  "description": "국도 ITS 장애감시장치 요일별 점검 동선 (카카오맵) + 팀 공유 점검 기록",
+  "dependencies": {
+    "@netlify/blobs": "^11.1.9"
+  }
+}
