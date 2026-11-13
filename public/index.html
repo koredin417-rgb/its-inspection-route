@@ -44,6 +44,7 @@ h1 .short{display:none}
 .menu button:hover{background:var(--hover)}
 .menu .danger{color:var(--bad)}
 .menu hr{border:0;border-top:1px solid var(--line);margin:4px 0}
+.menu .ver{padding:6px 12px 4px;font-size:11.5px;color:var(--muted)}
 
 /* 일차 탭 */
 .tabs{display:flex;flex-wrap:wrap;gap:6px;padding:10px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
@@ -92,7 +93,9 @@ h1 .short{display:none}
 .id{font-size:11.5px;color:var(--muted);overflow-wrap:anywhere}
 .last{font-size:11.5px;color:var(--muted);margin-top:1px;overflow-wrap:anywhere}
 .last .mm{color:var(--bad)}
-.links{display:flex;gap:10px;font-size:12px;margin-top:2px;flex-wrap:wrap}.links a{color:var(--accent);text-decoration:none}.links a:hover{text-decoration:underline}
+.links{display:flex;gap:10px;font-size:12px;margin-top:2px;flex-wrap:wrap}
+/* 길안내·로드뷰 버튼 (웹 링크가 아니라 앱/화면을 바로 엶) */
+.lk{background:none;border:0;padding:2px 0;font:inherit;font-size:12px;color:var(--accent);cursor:pointer;text-align:left}.lk:hover{text-decoration:underline}
 .leg{padding:0 16px 8px 50px;font-size:11.5px;color:var(--muted)}
 .status{padding:7px 16px;font-size:11.5px;color:var(--muted);border-top:1px solid var(--line)}
 
@@ -115,7 +118,8 @@ h1 .short{display:none}
 .legend .stl{display:flex;align-items:center;gap:6px;border-top:1px solid var(--line);margin-top:4px;padding-top:6px}
 .legend .lk{color:var(--muted);font-size:12px}
 .lp{display:inline-block;color:#fff;font:700 11px/18px var(--font);font-style:normal;padding:0 8px;border-radius:9px}
-.locbtn{position:absolute;right:10px;bottom:30px;z-index:12;width:42px;height:42px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--fg);box-shadow:0 1px 5px rgba(0,0,0,.25);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+/* 내 위치 버튼: 모서리(Netlify 배지 자리)에서 위로 올려 엄지로 누르기 쉽게 */
+.locbtn{position:absolute;right:12px;bottom:84px;z-index:12;width:46px;height:46px;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--fg);box-shadow:0 1px 5px rgba(0,0,0,.25);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
 .locbtn.on{color:var(--me)}
 .locbtn.wait svg{animation:spin 1.2s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -175,7 +179,17 @@ details.hist summary{cursor:pointer;color:var(--muted)}
 #logList .empty{color:var(--muted);cursor:default}
 .fl{display:grid;gap:4px;font-size:12.5px;font-weight:700}
 .clinks{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;padding-top:9px;border-top:1px solid var(--line);font-size:12.5px}
-.clinks a{color:var(--accent);text-decoration:none;font-weight:500}.clinks a:hover{text-decoration:underline}
+.clinks .lk{font-size:12.5px;font-weight:500}
+/* 로드뷰 (앱 안에서 바로 보기) */
+.rv{position:fixed;inset:0;z-index:55;background:#000;display:flex;flex-direction:column}
+.rv[hidden]{display:none}
+.rvhd{display:flex;align-items:center;gap:10px;padding:10px 14px;padding-top:max(10px,env(safe-area-inset-top));background:#1d2330;color:#fff}
+.rvhd b{flex:1;min-width:0;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rvhd .x{color:#fff;font-size:20px;padding:4px 6px}
+.rvbody{position:relative;flex:1;min-height:0}
+#rvBox{position:absolute;inset:0}
+.rvmsg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:#fff;background:rgba(0,0,0,.6);padding:10px 14px;border-radius:8px;font-size:13.5px;text-align:center;max-width:85%}
+.rvmsg:empty{display:none}
 
 /* 키 입력 / 점검자 입력 / 알림 */
 .setup{position:absolute;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:16px}
@@ -220,6 +234,8 @@ h1{font-size:14px}h1 .full{display:none}h1 .short{display:inline}.top p{display:
 <button type="button" data-m="csv">점검 기록 CSV 내보내기</button>
 <hr>
 <button type="button" data-m="key">카카오 API 키 변경</button>
+<hr>
+<div class="ver" id="verTxt"></div>
 </div>
 </header>
 <div class="tabs" id="tabs"></div>
@@ -263,13 +279,20 @@ h1{font-size:14px}h1 .full{display:none}h1 .short{display:inline}.top p{display:
 <ol id="logList"></ol>
 </div>
 </div>
+<div class="rv" id="rvDlg" hidden role="dialog" aria-label="로드뷰">
+<div class="rvhd"><b id="rvTtl">로드뷰</b><button type="button" class="x" id="rvClose" aria-label="로드뷰 닫기">✕</button></div>
+<div class="rvbody"><div id="rvBox"></div><div class="rvmsg" id="rvMsg"></div></div>
+</div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script>
+// 앱 버전 — 수정해서 배포할 때마다 바꾸세요 (⋯ 메뉴 맨 아래에 표시 → 휴대폰에 새 버전이 적용됐는지 확인용)
+// sw.js 의 CACHE 이름도 같이 바꾸면 홈 화면 앱이 예전 파일을 확실히 버립니다.
+var APP_VERSION = "2026-11-13 (v2)";
 // 키를 파일에 고정하려면 아래 두 값에 직접 넣으세요. 비워 두면 화면에서 입력받습니다.
 var KAKAO_JS_KEY = "a0e62e1b0e939cfc653a4585698aaad9";
 var KAKAO_REST_KEY = "";
 (function(){
-var DAYS=[{"d": "", "date": "", "name": "판암노드 #2링 ① COT→RT11 (대전·옥천·영동)", "color": "#2a7de1", "sub": 2, "node": "판암노드", "ring": "#2링", "base": [36.33639, 127.486779], "lead": null, "tail": [57.1, 45], "loop": [144.7, 127], "stops": [[12, "COT", "COT", "[국도04] 대전광역시 동구 세천동 562", 36.33639, 127.486779, "COT", ""], [13, "CCTV", "32004CTE40104", "[국도04] 대전광역시 동구 세천동 181-33", 36.335625, 127.484923, "RT1", "[국도04] 대전 세천동"], [14, "CCTV", "32004CTS40504", "[국도04] 충북 옥천군 군북면 증약리 1109-6", 36.33625, 127.520286, "RT2", "[국도04] 옥천 증약교"], [15, "CCTV", "32004CTS40534", "[국도04] 충북 옥천군 군북면 이백리 336", 36.33369, 127.52962, "RT3", "[국도04] 옥천 이백리(사각)"], [16, "CCTV", "32004CTS40904", "[국도04] 충북 옥천군 동이면 세산리 산 88-17", 36.268407, 127.623607, "RT4", "[국도04] 옥천 동이농공단지입구"], [17, "CCTV", "32004CTS40874", "[국도04] 충북 옥천군 동이면 세산리 33", 36.27065, 127.62016, "RT5", "[국도04] 옥천 적하3(사각)"], [18, "CCTV", "32004CTS41304", "[국도04] 충북 영동군 심천면 고당리 산 93-5", 36.218215, 127.681449, "RT6", "[국도04] 영동 심천면"], [19, "CCTV", "32004CTE41704", "[국도04] 충북 영동군 영동읍 오탄리 산 49-3", 36.190615, 127.7622, "RT7", "[국도04] 영동 오탄리"], [20, "CCTV", "32004CTS50201", "[국도04] 충북 영동군 영동읍 매천리 산37-15", 36.163688, 127.788217, "RT8", "[국도04] 영동 힐링교차로"], [21, "CCTV", "32004CTS50601", "[국도04] 충북 영동군 영동읍 가리 산52-3", 36.180248, 127.844553, "RT9", "[국도04] 영동 가리"], [22, "CCTV", "32004CTS51001", "[국도04] 충북 영동군 황간면 노근리 산34-4", 36.210008, 127.883748, "RT10", "[국도04] 영동 노근리"], [23, "CCTV", "32004CTS51401", "[국도04] 충북 영동군 황간면 광평리 산3-3", 36.222577, 127.932697, "RT11", "[국도04] 영동 광평교차로"]]}, {"d": "", "date": "", "name": "판암노드 #2링 ② RT12→RT23 (영동→옥천)", "color": "#e8833a", "sub": 2, "node": "판암노드", "ring": "#2링", "base": [36.33639, 127.486779], "lead": [55.3, 46], "tail": [4.6, 5], "loop": [135.9, 119], "stops": [[24, "CCTV", "32004CTE42502", "[국도04] 충북 영동군 황간면 광평리 21-2", 36.215868, 127.942106, "RT12", "[국도04] 영동 광평리"], [25, "CCTV", "32004CTS42702", "[국도04] 충북 영동군 추풍령면 사부리 533-3", 36.214362, 127.978942, "RT13", "[국도04] 영동 사부리교차로"], [26, "CCTV", "32004CTS51201", "[국도04] 충북 영동군 황간면 마산리 163-1", 36.220451, 127.908007, "RT14", "[국도04] 영동 마산터널"], [27, "CCTV", "32004CTS50801", "[국도04] 충북 영동군 황간면 서송원리 986-3", 36.195059, 127.863809, "RT15", "[국도04] 영동 서송원리"], [28, "CCTV", "32004CTS50401", "[국도04] 충북 영동군 영동읍 주곡리 427", 36.167207, 127.816184, "RT16", "[국도04] 영동 주곡교차로"], [29, "CCTV", "32004CTS41902", "[국도04] 충북 영동군 영동읍 부용리 4-2", 36.173275, 127.774287, "RT17", "[국도04] 영동 부용4"], [30, "CCTV", "32004CTS41502", "[국도04] 충북 영동군 심천면 약목리 764-8", 36.203633, 127.729969, "RT18", "[국도04] 영동 과적검문소"], [31, "CCTV", "32004CTE41101", "[국도21] 충북 옥천군 이원면 이원리 728-1", 36.249778, 127.633747, "RT19", "[국도04] 옥천 이원면"], [32, "VDS", "32004VDE41702", "[국도04] 충북 옥천군 이원면 건진리 산 2-1", 36.256271, 127.625548, "RT20", ""], [33, "CCTV", "32004CTE40702", "[국도04] 충북 옥천군 옥천읍 금구리 112-126", 36.298187, 127.565944, "RT21", "[국도04] 옥천역앞"], [34, "CCTV", "32037CTS10002", "[국도04] 충북 옥천군 군북면 지오리 168-2", 36.32485411, 127.5732385, "RT22", "[국도37] 옥천 옥천중앙비축창고"], [35, "CCTV", "32004CTE40302", "[국도04] 충북 옥천군 군북면 증약리 1064-3", 36.3382, 127.50824, "RT23", "[국도04] 옥천 마달령"]]}, {"d": "", "date": "", "name": "단양노드 #7링 제천·충주", "color": "#d6456b", "sub": 3, "node": "단양노드", "ring": "#7링", "base": [36.955375, 128.334485], "lead": null, "tail": [56.1, 48], "loop": [132.4, 118], "stops": [[36, "집중국", "COT", "[국도05] 충북 단양군 단양읍 현천리 산1-8", 36.955375, 128.334485, "COT", ""], [37, "CCTV", "32038CTE30604", "[국도38] 충북 제천시 봉양읍 장평리 676-4", 37.130155, 128.134554, "RT1", "[국도38] 제천 고산교차로"], [38, "CCTV", "32038CTE30504", "[국도38] 충북 제천시 봉양읍 장평리 845-7", 37.131154, 128.127703, "RT2", "[국도38] 제천 장평삼거리"], [39, "CCTV", "32038CTE30404", "[국도38] 충북 제천시 봉양읍 주포리 184-4", 37.131104, 128.11902, "RT3", "[국도38] 제천 주포2교"], [40, "CCTV", "32038CTS30304", "[국도38] 충북 제천시 봉양읍 연박리 1112-5", 37.134301, 128.105016, "RT4", "[국도38] 제천 마곡입구삼거리"], [41, "CCTV", "32038CTE30204", "[국도38] 충북 제천시 봉양읍 연박리 1190-6", 37.133205, 128.094959, "RT5", "[국도38] 제천 공전입구삼거리"], [42, "CCTV", "32038CTE30104", "[국도38] 충북 제천시 봉양읍 원박리 280-4", 37.132738, 128.088821, "RT6", "[국도38] 제천 원박사거리"], [43, "CCTV", "32038CTE30004", "[국도38] 충북 제천시 봉양읍 원박리 901-1", 37.137623, 128.076135, "RT7", "[국도38] 제천 원박교"], [44, "CCTV", "32038CTE11504", "[국도38] 충북 충주시 산척면 송강리 1141-2", 37.09094, 127.965625, "RT8", "[국도38] 충주 송강교차로"], [45, "CCTV", "32038CTE11404", "[국도38] 충북 충주시 산척면 송강리 1901-12", 37.081451, 127.954521, "RT9", "[국도38] 충주 산척사거리"]]}, {"d": "", "date": "", "name": "부여노드 #13링 부여·서천", "color": "#2e9e6b", "sub": 1, "node": "부여노드", "ring": "#13링", "base": [36.368383, 126.6111193], "lead": null, "tail": [48.1, 41], "loop": [143.6, 137], "stops": [[1, "집중국", "COT", "[국도04] 충남 부여군 부여읍 가탑리 5-5", 36.368383, 126.6111193, "COT", ""], [2, "VMS", "32029VMS50101", "[국도29] 충남 부여군 장암면 석동리 935-10", 36.247625, 126.878738, "RT1", ""], [3, "VSL", "32029VLS30201", "[국도29] 충남 부여군 장암면 석동리 936-10", 36.246509, 126.879632, "RT2", ""], [4, "VSL", "32029VLE30101", "[국도29] 충남 부여군 장암면 석동리 715-3", 36.243877, 126.882256, "RT3", ""], [5, "VMS", "32029VMS10202", "[국도29] 충남 서천군 화양면 보현리 286", 36.04869, 126.78696, "RT4", ""], [6, "VMS", "32029VME10102", "[국도29] 충남 서천군 화양면 옥포리 244-7", 36.040371, 126.783798, "RT5", ""], [7, "VMS", "32004VME55901", "[국도04] 충남 서천군 장항읍 성주리 189-2", 36.01424, 126.70876, "RT6", ""], [8, "VMS", "32004VME56001", "[국도04] 충남 서천군 마서면 송내리 470-1", 36.0246, 126.7123, "RT7", ""], [9, "VMS", "32004VMS56102", "[국도04] 충남 서천군 마서면 송내리 62-12", 36.0342, 126.7106, "RT8", ""], [10, "VMS", "32004VME56301", "[국도04] 충남 서천군 마서면 어리 14-5", 36.0567, 126.7085, "RT9", ""], [11, "VMS", "32004VMS56201", "[국도04] 충남 서천군 마서면 어리 14-5", 36.0568, 126.7083, "RT10", ""]]}, {"d": "", "date": "", "name": "내수노드 #13링 청주·진천·천안", "color": "#7a4fd1", "sub": 4, "node": "내수노드", "ring": "#13링", "base": [36.674329, 127.519111], "lead": null, "tail": [38.4, 39], "loop": [123.7, 130], "stops": [[46, "집중국", "COT", "[국도36] 충북 청주시 청원구 내수읍 국동리 119", 36.674329, 127.519111, "COT", ""], [47, "VMS", "32034VME50001", "[국도34] 충북 진천군 초평면 용기리 140", 36.78437, 127.55753, "RT1", ""], [48, "VMS", "32034VMS50101", "[국도34] 충북 진천군 초평면 용기리 1120-1", 36.78749, 127.54725, "RT2", ""], [49, "VMS", "32034VMS45301", "[국도34] 충남 천안시 서북구 입장면 신두리 201-4", 36.922752, 127.197239, "RT3", ""], [50, "집중국", "청삼PTN", "[국도01] 충남 천안시 동남구 삼룡동 333-30", 36.781046, 127.165133, "RT4", ""]]}];
+var DAYS=[{"d": "", "date": "", "name": "판암노드 #2링 ① COT→RT11 (대전·옥천·영동)", "color": "#2a7de1", "sub": 2, "node": "판암노드", "ring": "#2링", "base": [36.33639, 127.486779], "lead": null, "tail": [57.1, 45], "loop": [144.7, 127], "stops": [[12, "COT", "COT", "[국도04] 대전광역시 동구 세천동 562", 36.33639, 127.486779, "COT", ""], [13, "CCTV", "32004CTE40104", "[국도04] 대전광역시 동구 세천동 181-33", 36.335625, 127.484923, "RT1", "[국도04] 대전 세천동"], [14, "CCTV", "32004CTS40504", "[국도04] 충북 옥천군 군북면 증약리 1109-6", 36.33625, 127.520286, "RT2", "[국도04] 옥천 증약교"], [15, "CCTV", "32004CTS40534", "[국도04] 충북 옥천군 군북면 이백리 336", 36.33369, 127.52962, "RT3", "[국도04] 옥천 이백리(사각)"], [16, "CCTV", "32004CTS40904", "[국도04] 충북 옥천군 동이면 세산리 산 88-17", 36.268407, 127.623607, "RT4", "[국도04] 옥천 동이농공단지입구"], [17, "CCTV", "32004CTS40874", "[국도04] 충북 옥천군 동이면 세산리 33", 36.27065, 127.62016, "RT5", "[국도04] 옥천 적하3(사각)"], [18, "CCTV", "32004CTS41304", "[국도04] 충북 영동군 심천면 고당리 산 93-5", 36.218215, 127.681449, "RT6", "[국도04] 영동 심천면"], [19, "CCTV", "32004CTE41704", "[국도04] 충북 영동군 영동읍 오탄리 산 49-3", 36.190615, 127.7622, "RT7", "[국도04] 영동 오탄리"], [20, "CCTV", "32004CTS50201", "[국도04] 충북 영동군 영동읍 매천리 산37-15", 36.163688, 127.788217, "RT8", "[국도04] 영동 힐링교차로"], [21, "CCTV", "32004CTS50601", "[국도04] 충북 영동군 영동읍 가리 산52-3", 36.180248, 127.844553, "RT9", "[국도04] 영동 가리"], [22, "CCTV", "32004CTS51001", "[국도04] 충북 영동군 황간면 노근리 산34-4", 36.210008, 127.883748, "RT10", "[국도04] 영동 노근리"], [23, "CCTV", "32004CTS51401", "[국도04] 충북 영동군 황간면 광평리 산3-3", 36.222577, 127.932697, "RT11", "[국도04] 영동 광평교차로"]]}, {"d": "", "date": "", "name": "판암노드 #2링 ② RT12→RT23 (영동→옥천)", "color": "#e8833a", "sub": 2, "node": "판암노드", "ring": "#2링", "base": [36.33639, 127.486779], "lead": [55.3, 46], "tail": [4.6, 5], "loop": [135.9, 119], "stops": [[24, "CCTV", "32004CTE42502", "[국도04] 충북 영동군 황간면 광평리 21-2", 36.215868, 127.942106, "RT12", "[국도04] 영동 광평리"], [25, "CCTV", "32004CTS42702", "[국도04] 충북 영동군 추풍령면 사부리 533-3", 36.214362, 127.978942, "RT13", "[국도04] 영동 사부리교차로"], [26, "CCTV", "32004CTS51201", "[국도04] 충북 영동군 황간면 마산리 163-1", 36.220451, 127.908007, "RT14", "[국도04] 영동 마산터널"], [27, "CCTV", "32004CTS50801", "[국도04] 충북 영동군 황간면 서송원리 986-3", 36.195059, 127.863809, "RT15", "[국도04] 영동 서송원리"], [28, "CCTV", "32004CTS50401", "[국도04] 충북 영동군 영동읍 주곡리 427", 36.167207, 127.816184, "RT16", "[국도04] 영동 주곡교차로"], [29, "CCTV", "32004CTS41902", "[국도04] 충북 영동군 영동읍 부용리 4-2", 36.173275, 127.774287, "RT17", "[국도04] 영동 부용4"], [30, "CCTV", "32004CTS41502", "[국도04] 충북 영동군 심천면 약목리 764-8", 36.203633, 127.729969, "RT18", "[국도04] 영동 과적검문소"], [31, "CCTV", "32004CTE41101", "[국도21] 충북 옥천군 이원면 이원리 728-1", 36.249778, 127.633747, "RT19", "[국도04] 옥천 이원면"], [32, "VDS", "32004VDE41702", "[국도04] 충북 옥천군 이원면 건진리 산 2-1", 36.256271, 127.625548, "RT20", ""], [33, "CCTV", "32004CTE40702", "[국도04] 충북 옥천군 옥천읍 금구리 112-126", 36.298187, 127.565944, "RT21", "[국도04] 옥천역앞"], [34, "CCTV", "32037CTS10002", "[국도04] 충북 옥천군 군북면 지오리 168-2", 36.32485411, 127.5732385, "RT22", "[국도37] 옥천 옥천중앙비축창고"], [35, "CCTV", "32004CTE40302", "[국도04] 충북 옥천군 군북면 증약리 1064-3", 36.3382, 127.50824, "RT23", "[국도04] 옥천 마달령"]]}, {"d": "", "date": "", "name": "내수노드 #13링 청주·진천·천안", "color": "#7a4fd1", "sub": 4, "node": "내수노드", "ring": "#13링", "base": [36.674329, 127.519111], "lead": null, "tail": [38.4, 39], "loop": [123.7, 130], "stops": [[46, "집중국", "COT", "[국도36] 충북 청주시 청원구 내수읍 국동리 119", 36.674329, 127.519111, "COT", ""], [47, "VMS", "32034VME50001", "[국도34] 충북 진천군 초평면 용기리 140", 36.78437, 127.55753, "RT1", ""], [48, "VMS", "32034VMS50101", "[국도34] 충북 진천군 초평면 용기리 1120-1", 36.78749, 127.54725, "RT2", ""], [49, "VMS", "32034VMS45301", "[국도34] 충남 천안시 서북구 입장면 신두리 201-4", 36.922752, 127.197239, "RT3", ""]]}, {"d": "", "date": "", "name": "부여노드 #13링 부여·서천", "color": "#2e9e6b", "sub": 1, "node": "부여노드", "ring": "#13링", "base": [36.368383, 126.6111193], "lead": null, "tail": [48.1, 41], "loop": [143.6, 137], "stops": [[1, "집중국", "COT", "[국도04] 충남 부여군 부여읍 가탑리 5-5", 36.368383, 126.6111193, "COT", "", 1], [2, "VMS", "32029VMS50101", "[국도29] 충남 부여군 장암면 석동리 935-10", 36.247625, 126.878738, "RT1", ""], [3, "VSL", "32029VLS30201", "[국도29] 충남 부여군 장암면 석동리 936-10", 36.246509, 126.879632, "RT2", ""], [4, "VSL", "32029VLE30101", "[국도29] 충남 부여군 장암면 석동리 715-3", 36.243877, 126.882256, "RT3", ""], [5, "VMS", "32029VMS10202", "[국도29] 충남 서천군 화양면 보현리 286", 36.04869, 126.78696, "RT4", ""], [6, "VMS", "32029VME10102", "[국도29] 충남 서천군 화양면 옥포리 244-7", 36.040371, 126.783798, "RT5", ""], [7, "VMS", "32004VME55901", "[국도04] 충남 서천군 장항읍 성주리 189-2", 36.01424, 126.70876, "RT6", ""], [8, "VMS", "32004VME56001", "[국도04] 충남 서천군 마서면 송내리 470-1", 36.0246, 126.7123, "RT7", ""], [9, "VMS", "32004VMS56102", "[국도04] 충남 서천군 마서면 송내리 62-12", 36.0342, 126.7106, "RT8", ""], [10, "VMS", "32004VME56301", "[국도04] 충남 서천군 마서면 어리 14-5", 36.0567, 126.7085, "RT9", ""], [11, "VMS", "32004VMS56201", "[국도04] 충남 서천군 마서면 어리 14-5", 36.0568, 126.7083, "RT10", ""]]}, {"d": "", "date": "", "name": "단양노드 #7링 제천·충주", "color": "#d6456b", "sub": 3, "node": "단양노드", "ring": "#7링", "base": [36.955375, 128.334485], "lead": null, "tail": [56.1, 48], "loop": [132.4, 118], "stops": [[36, "집중국", "COT", "[국도05] 충북 단양군 단양읍 현천리 산1-8", 36.955375, 128.334485, "COT", ""], [37, "CCTV", "32038CTE30604", "[국도38] 충북 제천시 봉양읍 장평리 676-4", 37.130155, 128.134554, "RT1", "[국도38] 제천 고산교차로"], [38, "CCTV", "32038CTE30504", "[국도38] 충북 제천시 봉양읍 장평리 845-7", 37.131154, 128.127703, "RT2", "[국도38] 제천 장평삼거리"], [39, "CCTV", "32038CTE30404", "[국도38] 충북 제천시 봉양읍 주포리 184-4", 37.131104, 128.11902, "RT3", "[국도38] 제천 주포2교"], [40, "CCTV", "32038CTS30304", "[국도38] 충북 제천시 봉양읍 연박리 1112-5", 37.134301, 128.105016, "RT4", "[국도38] 제천 마곡입구삼거리"], [41, "CCTV", "32038CTE30204", "[국도38] 충북 제천시 봉양읍 연박리 1190-6", 37.133205, 128.094959, "RT5", "[국도38] 제천 공전입구삼거리"], [42, "CCTV", "32038CTE30104", "[국도38] 충북 제천시 봉양읍 원박리 280-4", 37.132738, 128.088821, "RT6", "[국도38] 제천 원박사거리"], [43, "CCTV", "32038CTE30004", "[국도38] 충북 제천시 봉양읍 원박리 901-1", 37.137623, 128.076135, "RT7", "[국도38] 제천 원박교"], [44, "CCTV", "32038CTE11504", "[국도38] 충북 충주시 산척면 송강리 1141-2", 37.09094, 127.965625, "RT8", "[국도38] 충주 송강교차로"], [45, "CCTV", "32038CTE11404", "[국도38] 충북 충주시 산척면 송강리 1901-12", 37.081451, 127.954521, "RT9", "[국도38] 충주 산척사거리"]]}];
 function ls(k,v){try{if(v===undefined)return localStorage.getItem(k)||"";if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v);return true}catch(e){return v===undefined?"":false}}
 var jsKey=ls("kakaoJsKey")||KAKAO_JS_KEY, restKey="";
 function $(id){return document.getElementById(id)}
@@ -282,9 +305,31 @@ function road(s){var m=/^\s*\[([^\]]*)\]/.exec(s.addr);return m?m[1]:""}
 function coordTxt(s){return (+s.lat).toFixed(6)+", "+(+s.lng).toFixed(6)}
 function kName(s){return encodeURIComponent(jibun(s).replace(/[,\/]/g," "))}
 function kakaoTo(s){return "https://map.kakao.com/link/to/"+kName(s)+","+s.lat+","+s.lng}
-function kakaoAt(s){return "https://map.kakao.com/link/map/"+kName(s)+","+s.lat+","+s.lng}
-function kakaoSeg(a,b){return "https://map.kakao.com/link/from/"+kName(a)+","+a.lat+","+a.lng+"/to/"+kName(b)+","+b.lat+","+b.lng}
-DAYS.forEach(function(D,di){D.stops=D.stops.map(function(r,i){return{no:r[0],type:r[1],id:r[2],addr:r[3],lat:r[4],lng:r[5],seq:r[6],nm:r[7],di:di,i:i}})});
+// stops 9번째 값이 1이면 좌표 대신 지번 주소로 찾은 위치에 표시 (카카오 주소 검색, 결과는 이 기기에 저장)
+DAYS.forEach(function(D,di){D.stops=D.stops.map(function(r,i){return{no:r[0],type:r[1],id:r[2],addr:r[3],lat:r[4],lng:r[5],seq:r[6],nm:r[7],geo:r[8]===1,di:di,i:i}})});
+var GEO="geo.v1:";
+// 상위국(⌂) 위치가 이 지점과 같으면 함께 옮김 (예: 부여노드 1번 = 부여 집중국)
+function applyGeo(s,lat,lng){var D=DAYS[s.di];if(D.base[0]===s.lat&&D.base[1]===s.lng)D.base=[lat,lng];s.lat=lat;s.lng=lng;s.geoDone=true}
+DAYS.forEach(function(D){D.stops.forEach(function(s){if(!s.geo)return;try{var c=JSON.parse(ls(GEO+jibun(s))||"null");if(c&&isFinite(c[0])&&isFinite(c[1]))applyGeo(s,+c[0],+c[1])}catch(e){}})});
+
+// ── 길안내: 휴대폰은 카카오내비 앱을 바로 실행, PC는 카카오맵 웹 길찾기 ──
+// 카카오내비는 항상 '현재 위치'에서 출발합니다 (n번→n+1번도 지금 위치 → n+1번 안내)
+var KAKAO_SDK="https://t1.kakaocdn.net/kakao_js_sdk/2.8.1/kakao.min.js";
+function phone(){return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1)}
+function naviReady(){try{return !!(window.Kakao&&Kakao.Navi&&Kakao.isInitialized())}catch(e){return false}}
+var sdkLoading=false;
+function loadNaviSdk(){
+  if(naviReady()||sdkLoading||!jsKey)return;sdkLoading=true;
+  var s=document.createElement("script");s.src=KAKAO_SDK;s.crossOrigin="anonymous";
+  s.onload=function(){sdkLoading=false;try{if(!Kakao.isInitialized())Kakao.init(jsKey)}catch(e){}};
+  s.onerror=function(){sdkLoading=false};
+  document.head.appendChild(s);
+}
+function navi(s){
+  if(!phone()){window.open(kakaoTo(s),"_blank","noopener");return}
+  if(naviReady()){try{Kakao.Navi.start({name:jibun(s),x:+s.lng,y:+s.lat,coordType:"wgs84"});return}catch(e){}}
+  loadNaviSdk();toast("카카오내비 연결 준비 중 — 잠시 후 다시 눌러 주세요");
+}
 var map=null,active=-1,cur=null,formMode=null,st=$("status"),card=$("card"),box=$("days"),tabs=$("tabs");
 // 날짜가 정해지면 DAYS의 d(요일)·date(날짜)를 채우면 표시됩니다.
 function dayLabel(D,di){return (di+1)+"일차"+(D.d?" · "+D.d+" "+D.date:"")}
@@ -407,21 +452,33 @@ $("whoCancel").onclick=function(){$("whoDlg").hidden=true;whoCb=null};
 $("whoBtn").onclick=function(){askWho()};
 
 // ── 현재 위치 (GPS) ──
-var me={pos:null,watch:null,ov:null,circle:null,center:false},locbtn=$("locbtn");
+var me={pos:null,watch:null,ov:null,circle:null,center:false,follow:0,chk:null},locbtn=$("locbtn");
 function distKm(a,b){var R=6371,r=Math.PI/180,x=Math.sin((b.lat-a.lat)*r/2),y=Math.sin((b.lng-a.lng)*r/2);return 2*R*Math.asin(Math.sqrt(x*x+Math.cos(a.lat*r)*Math.cos(b.lat*r)*y*y))}
 function kmTxt(d){return d<1?Math.round(d*1000)+"m":(d<10?d.toFixed(1):Math.round(d))+"km"}
 function distTxt(s){return me.pos?" · 현위치에서 "+kmTxt(distKm(me.pos,s)):""}
+function accTxt(m){return "±"+(m<1000?Math.round(m)+"m":(m/1000).toFixed(1)+"km")}
+// 위치 찾기 속도·정확도 개선:
+//  1) 먼저 대략 위치(기지국·와이파이, 1분 이내 값 재사용)를 바로 표시
+//  2) 동시에 GPS 정밀 위치를 계속 받아서 더 정확한 값으로 갱신
+//  3) 정확한 값이 부정확한 값으로 덮이지 않게 하고, 버튼을 누른 뒤 15초 동안은 정확도가 좋아지면 다시 가운데로
 function startGps(center){
   if(!navigator.geolocation){toast("이 기기/브라우저는 위치 기능을 지원하지 않습니다");return}
   if(!window.isSecureContext){toast("위치는 https 주소에서만 사용할 수 있습니다");return}
-  me.center=center;
-  if(me.watch!==null){if(me.pos&&center){me.center=false;centerMe()}return}
+  if(center){me.center=true;me.follow=Date.now()+15000;
+    if(me.pos){me.center=false;centerMe();toast("내 위치 · 정확도 "+accTxt(me.pos.acc))}}
+  if(me.watch!==null)return;
   locbtn.classList.add("wait");
-  me.watch=navigator.geolocation.watchPosition(onPos,onPosErr,{enableHighAccuracy:true,maximumAge:10000,timeout:30000});
+  navigator.geolocation.getCurrentPosition(onPos,function(){},{enableHighAccuracy:false,maximumAge:60000,timeout:5000});
+  me.watch=navigator.geolocation.watchPosition(onPos,onPosErr,{enableHighAccuracy:true,maximumAge:5000,timeout:20000});
+  // 15초가 지나도 오차가 500m보다 크면 '정확한 위치' 설정 안내 (대략적 위치만 허용된 경우가 많음)
+  clearTimeout(me.chk);me.chk=setTimeout(function(){if(me.pos&&me.pos.acc>500)toast("위치 오차가 큽니다("+accTxt(me.pos.acc)+") — 휴대폰 설정에서 이 앱(브라우저)의 위치를 '정확한 위치'로 허용하고 GPS를 켜 주세요")},15000);
 }
-function onPos(p){me.pos={lat:p.coords.latitude,lng:p.coords.longitude,acc:p.coords.accuracy||0};
-  locbtn.classList.remove("wait");locbtn.classList.add("on");drawMe();updDist();
-  if(me.center){me.center=false;centerMe()}}
+function onPos(p){var c=p.coords,n={lat:c.latitude,lng:c.longitude,acc:c.accuracy||9999,t:p.timestamp||Date.now()},o=me.pos;
+  // 15초 안의 더 정확한 값이 있으면 덜 정확한 새 값은 버림 (대략 위치가 GPS 위치를 덮지 않게)
+  if(o&&n.acc>o.acc*1.5&&n.t-o.t<15000)return;
+  var better=!o||n.acc<o.acc/2;
+  me.pos=n;locbtn.classList.remove("wait");locbtn.classList.add("on");drawMe();updDist();
+  if(me.center||(better&&me.follow&&Date.now()<me.follow)){me.center=false;centerMe()}}
 function onPosErr(e){locbtn.classList.remove("wait");
   if(e.code===1){navigator.geolocation.clearWatch(me.watch);me.watch=null;locbtn.classList.remove("on");toast("위치 권한이 꺼져 있습니다 — 브라우저/휴대폰 설정에서 위치를 허용해 주세요")}
   else if(!me.pos)toast(e.code===3?"위치 확인 시간 초과 — 잠시 후 다시 눌러 주세요":"현재 위치를 확인할 수 없습니다")}
@@ -440,18 +497,23 @@ function rowHtml(D,s){var i=s.i,r=rec(s),v=r&&r.st||"",prev=i?D.stops[i-1]:null;
   +"<div class='addr'>"+esc(jibun(s))+(v?"<span class='chip "+v+"'>"+ST_TXT[v]+"</span>":"")+"</div>"
   +"<div class='id'>선번 "+esc(s.seq)+" · "+esc(s.type)+" · "+esc(s.id)+(s.nm?" · "+esc(s.nm):"")+" · 순번 "+s.no+"<span id='d"+s.di+"_"+i+"'>"+distTxt(s)+"</span></div>"
   +(r&&r.by?"<div class='last'>"+esc(r.by)+" · "+fmt(r.at)+(r.memo?" · <span"+(v==="bad"?" class='mm'":"")+">"+esc(r.memo)+"</span>":"")+"</div>":"")
-  +"<div class='links'>"+(prev?"<a href='"+kakaoSeg(prev,s)+"' target='_blank' rel='noopener'>"+i+"번→"+(i+1)+"번 길찾기</a>":"")+"<a href='"+kakaoTo(s)+"' target='_blank' rel='noopener'>현위치→여기</a></div></div>"}
+  +"<div class='links'>"+(prev?"<button type='button' class='lk' data-nav='1'>"+i+"번→"+(i+1)+"번 길찾기</button>":"")+"<button type='button' class='lk' data-nav='1'>현위치→여기</button></div></div>"}
+// 거리 안내 (도로 경로를 불러오면 실제 값으로 갱신)
+function metaTxt(D){return D.stops.length+"개 지점"+(D.rt?" · 1번→마지막 약 "+Math.round(D.rt.dist/1000)+"km · 운전 "+Math.floor(D.rt.dur/3600)+"시간 "+Math.round(D.rt.dur%3600/60)+"분":"")+loopTxt(D)}
+function leadTxt(D){return "⌂ "+esc(D.node)+"(상위국) 출발 → 1번까지 이동 약 "+Math.round(D.lead[0])+"km"}
+function tailTxt(D){return "⌂ "+D.stops.length+"번 → "+esc(D.node)+"(상위국) 복귀 약 "+Math.round(D.tail[0])+"km"}
 DAYS.forEach(function(D,di){
   var sec=document.createElement("section");sec.className="day";sec.dataset.i=di;
-  var h="<div class='dayhead' role='button' tabindex='0' aria-expanded='true'><span class='car'>▾</span><b style='color:"+D.color+"'>"+dayLabel(D,di)+"</b><span>"+esc(D.name)+"</span><span class='meta' id='m"+di+"'>"+D.stops.length+"개 지점"+loopTxt(D)+"</span><span class='prog' id='p"+di+"'></span></div>"
+  var h="<div class='dayhead' role='button' tabindex='0' aria-expanded='true'><span class='car'>▾</span><b style='color:"+D.color+"'>"+dayLabel(D,di)+"</b><span>"+esc(D.name)+"</span><span class='meta' id='m"+di+"'>"+metaTxt(D)+"</span><span class='prog' id='p"+di+"'></span></div>"
     +"<div class='pbar dpb' id='pb"+di+"'><i class='ok'></i><i class='ng'></i></div>"
-    +"<div class='body'>"+(D.lead?"<div class='leg'>⌂ "+esc(D.node)+"(상위국) 출발 → 1번까지 이동 약 "+Math.round(D.lead[0])+"km</div>":"")+"<ol class='stops'>";
+    +"<div class='body'>"+(D.lead?"<div class='leg' id='lead"+di+"'>"+leadTxt(D)+"</div>":"")+"<ol class='stops'>";
   D.stops.forEach(function(s,i){var v=stOf(s);h+="<li class='stop"+(v?" "+v:"")+"' id='r"+di+"_"+i+"' data-i='"+i+"'>"+rowHtml(D,s)+"</li>"});
-  sec.innerHTML=h+"</ol><div class='leg'>⌂ "+D.stops.length+"번 → "+esc(D.node)+"(상위국) 복귀 약 "+Math.round(D.tail[0])+"km</div></div>";
+  sec.innerHTML=h+"</ol><div class='leg' id='tail"+di+"'>"+tailTxt(D)+"</div></div>";
   var hd=sec.querySelector(".dayhead");
   function fold(){var f=sec.classList.toggle("fold");hd.setAttribute("aria-expanded",String(!f))}
   hd.addEventListener("click",fold);hd.addEventListener("keydown",function(e){if(e.key==="Enter"||e.key===" "){e.preventDefault();fold()}});
-  sec.querySelector(".stops").addEventListener("click",function(e){var li=e.target.closest(".stop");if(!li||e.target.closest("a"))return;
+  sec.querySelector(".stops").addEventListener("click",function(e){var li=e.target.closest(".stop");if(!li)return;
+    if(e.target.closest("[data-nav]")){navi(D.stops[+li.dataset.i]);return}
     if(active!==-1&&active!==di)show(di);openCard(di,+li.dataset.i,"zoom")});
   box.appendChild(sec);
 });
@@ -563,7 +625,7 @@ function renderCard(fresh){
   }
   if(r&&r.log&&r.log.length)h+="<details class='hist'"+(histOpen?" open":"")+"><summary>기록 "+r.log.length+"건 (누가 · 언제 · 사유)</summary><ol>"
     +r.log.slice().reverse().map(function(e){return "<li>"+logLine(e,true)+"</li>"}).join("")+"</ol></details>";
-  h+="<div class='clinks'><a href='"+kakaoTo(s)+"' target='_blank' rel='noopener'>카카오맵 길안내</a>"+(prev?"<a href='"+kakaoSeg(prev,s)+"' target='_blank' rel='noopener'>"+cur.i+"번→"+(cur.i+1)+"번 길찾기</a>":"")+"<a href='"+kakaoAt(s)+"' target='_blank' rel='noopener'>카카오맵에서 보기</a></div>";
+  h+="<div class='clinks'><button type='button' class='lk' data-a='navi'>카카오내비 길안내</button>"+(prev?"<button type='button' class='lk' data-a='navi'>"+cur.i+"번→"+(cur.i+1)+"번 길찾기</button>":"")+"<button type='button' class='lk' data-a='rv'>로드뷰 보기</button></div>";
   card.innerHTML=h;card.hidden=false;card.scrollTop=sc;placeLoc();
 }
 function copy(t,msg){function fb(){var a=document.createElement("textarea");a.value=t;a.style.position="fixed";a.style.opacity="0";document.body.appendChild(a);a.select();try{document.execCommand("copy");toast(msg)}catch(e){toast(t)}a.remove()}
@@ -574,6 +636,8 @@ card.addEventListener("click",function(e){var b=e.target.closest("[data-a]");if(
   if(a==="close")closeCard();
   else if(a==="cpj")copy(jibun(s),"지번을 복사했습니다");
   else if(a==="cpc")copy(coordTxt(s),"좌표를 복사했습니다");
+  else if(a==="navi")navi(s);
+  else if(a==="rv")openRoadview(s);
   else if(a==="done")act(s,{st:"done",memo:"",label:"완료"},closeForm);
   else if(a==="bad"||a==="edit"||a==="cancel"){if(formMode===a){formMode=null;renderCard()}else openForm(a)}
   else if(a==="fclose"){formMode=null;renderCard()}
@@ -592,7 +656,7 @@ $("menuBtn").onclick=function(e){e.stopPropagation();menu.hidden=!menu.hidden};
 document.addEventListener("click",function(e){if(!menu.hidden&&!e.target.closest("#menu"))menu.hidden=true});
 menu.onclick=function(e){var b=e.target.closest("[data-m]");if(!b)return;menu.hidden=true;var m=b.dataset.m;
   if(m==="log")openLog();else if(m==="who")askWho();else if(m==="csv")exportCsv();else if(m==="key")askKey()};
-document.addEventListener("keydown",function(e){if(e.key!=="Escape")return;if(!$("whoDlg").hidden){if(who){$("whoDlg").hidden=true;whoCb=null}}else if(!$("logDlg").hidden)$("logDlg").hidden=true;else if(!menu.hidden)menu.hidden=true;else if(formMode){formMode=null;renderCard()}else closeCard()});
+document.addEventListener("keydown",function(e){if(e.key!=="Escape")return;if(!$("rvDlg").hidden)closeRoadview();else if(!$("whoDlg").hidden){if(who){$("whoDlg").hidden=true;whoCb=null}}else if(!$("logDlg").hidden)$("logDlg").hidden=true;else if(!menu.hidden)menu.hidden=true;else if(formMode){formMode=null;renderCard()}else closeCard()});
 $("syncBtn").onclick=function(){if(SY.mode==="local"){toast("공유 서버가 없어 이 기기에만 저장됩니다");return}
   if(SY.mode!=="shared"){SY.mode="init";SY.fail=0}toast("동기화 중…");tick()};
 // 작업 로그: 모든 지점의 기록을 최신순으로, 점검자별로 골라 보기. 줄을 누르면 그 지점으로 이동
@@ -632,11 +696,31 @@ function pinState(D,i){if(!D.pinEls)return;var s=D.stops[i],v=stOf(s),el=D.pinEl
   el.className="pin"+(v?" "+v:"")+(sel?" sel":"");el.style.background=stColor(v,D);
   el.innerHTML=(i+1)+(v==="done"?"<span class='pt'>완료</span>":v==="bad"?"<span class='pt'>이상</span>":"");
   D.pins[i].setZIndex(sel?30:v==="bad"?12:10)}
-function init(){
+// 지번 주소로 위치를 찾는 지점(부여노드 1번 등)을 먼저 처리한 뒤 지도를 그림 (최대 4초 기다리고, 못 찾으면 기존 좌표)
+function geoFix(cb){
+  var C=kakao.maps,todo=[],fin=false;each(function(s){if(s.geo&&!s.geoDone)todo.push(s)});
+  if(!todo.length||!C.services){cb();return}
+  var g=new C.services.Geocoder(),left=todo.length;
+  function end(){if(!fin){fin=true;cb()}}
+  setTimeout(end,4000);
+  todo.forEach(function(s){var a=jibun(s);g.addressSearch(a,function(r,stt){
+    if(stt===C.services.Status.OK&&r&&r[0]&&isFinite(r[0].y)&&isFinite(r[0].x)){
+      var D=DAYS[s.di],moveHome=D.base[0]===s.lat&&D.base[1]===s.lng;
+      applyGeo(s,+r[0].y,+r[0].x);ls(GEO+a,JSON.stringify([s.lat,s.lng]));
+      if(fin&&D.pins){var ll=new C.LatLng(s.lat,s.lng);D.pins[s.i].setPosition(ll);if(moveHome)D.home.setPosition(ll)} // 4초 뒤 늦게 찾은 경우
+      updDist();if(cur&&cur.di===s.di&&cur.i===s.i)renderCard();
+    }else toast(dayLabel(DAYS[s.di],s.di)+" "+(s.i+1)+"번: 지번 주소 위치를 찾지 못해 저장된 좌표로 표시합니다");
+    if(--left===0)end()})});
+}
+function init(){geoFix(build)}
+function build(){
   var C=kakao.maps;
   map=new C.Map($("map"),{center:new C.LatLng(36.5,127.6),level:11});
   map.addControl(new C.MapTypeControl(),C.ControlPosition.TOPRIGHT);
-  map.addControl(new C.ZoomControl(),C.ControlPosition.RIGHT);
+  // 휴대폰에서는 확대·축소 버튼을 왼쪽에 (오른쪽은 내 위치 버튼 자리)
+  map.addControl(new C.ZoomControl(),mobile()?C.ControlPosition.LEFT:C.ControlPosition.RIGHT);
+  // 지도를 직접 움직이면 내 위치 따라가기 멈춤
+  C.event.addListener(map,"dragstart",function(){me.follow=0;me.center=false});
   var homes={};
   DAYS.forEach(function(D){
     if(!homes[D.node]){var el=document.createElement("div");el.className="home";el.textContent="⌂ "+D.node+" (상위국)";
@@ -669,8 +753,17 @@ function init(){
 function setRoute(D,di,coords,dist,dur,src){
   D.line.setPath(coords.map(function(p){return new kakao.maps.LatLng(p[0],p[1])}));
   D.line.setOptions({strokeStyle:"solid",strokeWeight:5,strokeOpacity:.85});
-  $("m"+di).textContent=D.stops.length+"개 지점 · 1번→마지막 약 "+Math.round(dist/1000)+"km · 운전 "+Math.floor(dur/3600)+"시간 "+Math.round(dur%3600/60)+"분"+loopTxt(D);
+  D.rt={dist:dist,dur:dur};$("m"+di).textContent=metaTxt(D);
   D.src=src;
+}
+// 상위국 출발·복귀 거리(⌂ → 1번 … 마지막 → ⌂)도 지점 위치로 다시 계산 — 지점을 바꿔도 자동으로 맞음. 실패하면 저장된 값 유지
+function osrmLoop(D,di){
+  var b=[D.base[1],D.base[0]],c=[b].concat(D.stops.map(function(s){return[s.lng,s.lat]}),[b]);
+  return fetch("https://router.project-osrm.org/route/v1/driving/"+c.map(function(p){return p.join(",")}).join(";")+"?overview=false")
+  .then(function(r){return r.json()}).then(function(j){var R=j.routes&&j.routes[0];if(!R||!R.legs||!R.legs.length)throw 0;
+    var L=R.legs,first=L[0],last=L[L.length-1];
+    D.loop=[R.distance/1000,R.duration/60];D.tail=[last.distance/1000,last.duration/60];if(D.lead)D.lead=[first.distance/1000,first.duration/60];
+    $("m"+di).textContent=metaTxt(D);var t=$("tail"+di),l=$("lead"+di);if(t)t.innerHTML=tailTxt(D);if(l&&D.lead)l.innerHTML=leadTxt(D)});
 }
 function kakaoRoute(D){
   var S=D.stops,body={origin:{x:S[0].lng,y:S[0].lat},destination:{x:S[S.length-1].lng,y:S[S.length-1].lat},waypoints:S.slice(1,-1).map(function(s,i){return{name:"p"+i,x:s.lng,y:s.lat}}),priority:"RECOMMEND"};
@@ -690,12 +783,32 @@ function loadRoutes(){
   st.textContent="도로 경로 불러오는 중…";var done=0,res=[];
   DAYS.forEach(function(D,di){
     (restKey?kakaoRoute(D).catch(function(){return osrmRoute(D)}):osrmRoute(D))
-    .then(function(r){setRoute(D,di,r.pts,r.dist,r.dur,r.src);res.push(r.src)}).catch(function(){})
+    .then(function(r){setRoute(D,di,r.pts,r.dist,r.dur,r.src);res.push(r.src);return osrmLoop(D,di).catch(function(){})}).catch(function(){})
     .then(function(){if(++done<DAYS.length)return;
       if(!res.length)st.textContent="도로 경로를 불러오지 못해 직선(점선)으로 표시됨";
       else st.textContent="도로 경로: "+res.filter(function(v,i,a){return a.indexOf(v)===i}).join(", ")+" 기준"+(res.length<DAYS.length?" ("+res.length+"/"+DAYS.length+"일, 나머지는 직선)":"")+" · 시간은 참고용";});
   });
 }
+// ── 로드뷰: 앱 안에서 바로 보기 (가장 가까운 로드뷰 위치에서 이 지점을 바라보고, 지점에 마커 표시) ──
+var RVS={tok:null};
+function openRoadview(s){
+  if(!map||!kakao.maps.Roadview){toast("지도를 불러온 뒤 다시 눌러 주세요");return}
+  var C=kakao.maps,pos=new C.LatLng(s.lat,s.lng),box=$("rvBox"),msg=$("rvMsg"),tok={};RVS.tok=tok;
+  $("rvTtl").textContent=dayLabel(DAYS[s.di],s.di)+" "+(s.i+1)+"번 · "+jibun(s);
+  msg.textContent="로드뷰 찾는 중…";box.innerHTML="";$("rvDlg").hidden=false;
+  var rv=new C.Roadview(box),client=new C.RoadviewClient();
+  C.event.addListener(rv,"init",function(){if(RVS.tok!==tok)return;msg.textContent="";
+    var mk=new C.Marker({position:pos});mk.setMap(rv);
+    try{rv.setViewpoint(rv.getProjection().viewpointFromCoords(mk.getPosition(),mk.getAltitude()))}catch(e){}});
+  // 100m 안에서 먼저 찾고, 없으면 300m까지 넓혀서 찾음
+  function go(id,r){if(RVS.tok!==tok)return;
+    if(id){rv.setPanoId(id,pos);return}
+    if(r<300){client.getNearestPanoId(pos,300,function(id2){go(id2,300)});return}
+    msg.textContent="이 지점 근처(300m 안)에는 로드뷰가 없습니다"}
+  client.getNearestPanoId(pos,100,function(id){go(id,100)});
+}
+function closeRoadview(){RVS.tok=null;$("rvDlg").hidden=true;$("rvBox").innerHTML=""}
+$("rvClose").onclick=closeRoadview;
 function askKey(msg){
   var s=$("setup");s.hidden=false;$("keyerr").textContent=msg||"";s.querySelector("h2").textContent=msg?"지도를 불러오지 못했습니다 — 카카오 도메인 등록 필요":"카카오맵 API 키 입력";if(msg)$("keyerr").innerHTML=esc(msg)+"<br><br>카카오 개발자 사이트 → 플랫폼 키 → JavaScript 키 → JavaScript SDK 도메인에 <b>"+esc(location.origin)+"</b> 을(를) 그대로 등록하고 몇 분 뒤 새로고침하세요. 키는 다시 입력할 필요 없습니다.";
   $("jsKey").value=jsKey;$("restKey").value=restKey;st.textContent="카카오맵 API 키가 필요합니다";
@@ -703,6 +816,7 @@ function askKey(msg){
 $("keyform").onsubmit=function(e){e.preventDefault();
   ls("kakaoJsKey",$("jsKey").value.trim());ls("kakaoRestKey",$("restKey").value.trim());location.reload();};
 renderWho();
+$("verTxt").textContent="버전 "+APP_VERSION;
 show(-1);
 syncUI();tick();
 if(!who)askWho(); // 처음 열면 이름부터 (누가 기록했는지 남기기 위해)
@@ -714,8 +828,11 @@ function offlineMsg(){if(navigator.onLine!==false)return false;st.textContent="�
 window.addEventListener("online",function(){if(!map)location.reload()});
 if(!jsKey){askKey();return}
 var sc=document.createElement("script");
-sc.src="https://dapi.kakao.com/v2/maps/sdk.js?appkey="+encodeURIComponent(jsKey)+"&autoload=false";
+// libraries=services : 지번 주소로 위치 찾기(부여노드 1번 등)에 필요
+sc.src="https://dapi.kakao.com/v2/maps/sdk.js?appkey="+encodeURIComponent(jsKey)+"&libraries=services&autoload=false";
 sc.onload=function(){if(!window.kakao||!kakao.maps){askKey("지도 SDK를 불러오지 못했습니다.");return}kakao.maps.load(init)};
+// 휴대폰이면 카카오내비 연결용 SDK를 미리 불러 둠 (버튼을 누르면 바로 내비 앱이 열리도록)
+if(phone())loadNaviSdk();
 sc.onerror=function(){if(offlineMsg())return;askKey("지도를 불러오지 못했습니다. 키가 맞는지, 이 주소("+location.origin+")가 카카오 앱의 Web 플랫폼 도메인에 등록돼 있는지 확인해 주세요.")};
 document.head.appendChild(sc);
 setTimeout(function(){if(!map&&$("setup").hidden&&!offlineMsg())askKey("지도가 응답하지 않습니다. 키와 등록 도메인("+location.origin+"), 카카오맵 사용 설정(ON)을 확인해 주세요.")},8000);
