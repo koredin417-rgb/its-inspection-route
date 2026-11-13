@@ -287,7 +287,7 @@ h1{font-size:14px}h1 .full{display:none}h1 .short{display:inline}.top p{display:
 <script>
 // 앱 버전 — 수정해서 배포할 때마다 바꾸세요 (⋯ 메뉴 맨 아래에 표시 → 휴대폰에 새 버전이 적용됐는지 확인용)
 // sw.js 의 CACHE 이름도 같이 바꾸면 홈 화면 앱이 예전 파일을 확실히 버립니다.
-var APP_VERSION = "2026-11-13 (v2)";
+var APP_VERSION = "2026-11-13 (v3)";
 // 키를 파일에 고정하려면 아래 두 값에 직접 넣으세요. 비워 두면 화면에서 입력받습니다.
 var KAKAO_JS_KEY = "a0e62e1b0e939cfc653a4585698aaad9";
 var KAKAO_REST_KEY = "";
@@ -464,23 +464,33 @@ function accTxt(m){return "±"+(m<1000?Math.round(m)+"m":(m/1000).toFixed(1)+"km
 function startGps(center){
   if(!navigator.geolocation){toast("이 기기/브라우저는 위치 기능을 지원하지 않습니다");return}
   if(!window.isSecureContext){toast("위치는 https 주소에서만 사용할 수 있습니다");return}
-  if(center){me.center=true;me.follow=Date.now()+15000;
-    if(me.pos){me.center=false;centerMe();toast("내 위치 · 정확도 "+accTxt(me.pos.acc))}}
   if(me.watch!==null)return;
+  me.center=!!center;me.follow=center?Date.now()+15000:0;
   locbtn.classList.add("wait");
   navigator.geolocation.getCurrentPosition(onPos,function(){},{enableHighAccuracy:false,maximumAge:60000,timeout:5000});
   me.watch=navigator.geolocation.watchPosition(onPos,onPosErr,{enableHighAccuracy:true,maximumAge:5000,timeout:20000});
   // 15초가 지나도 오차가 500m보다 크면 '정확한 위치' 설정 안내 (대략적 위치만 허용된 경우가 많음)
   clearTimeout(me.chk);me.chk=setTimeout(function(){if(me.pos&&me.pos.acc>500)toast("위치 오차가 큽니다("+accTxt(me.pos.acc)+") — 휴대폰 설정에서 이 앱(브라우저)의 위치를 '정확한 위치'로 허용하고 GPS를 켜 주세요")},15000);
+  setLocBtn();
 }
-function onPos(p){var c=p.coords,n={lat:c.latitude,lng:c.longitude,acc:c.accuracy||9999,t:p.timestamp||Date.now()},o=me.pos;
+// 끄기: 위치 추적을 멈추고 지도의 내 위치 점·원, 목록의 '현위치에서 n km'를 지움
+function stopGps(){
+  if(me.watch!==null)navigator.geolocation.clearWatch(me.watch);
+  me.watch=null;me.pos=null;me.center=false;me.follow=0;clearTimeout(me.chk);
+  if(me.ov){me.ov.setMap(null);me.circle.setMap(null);me.ov=me.circle=null}
+  locbtn.classList.remove("wait","on");setLocBtn();updDist();
+}
+function setLocBtn(){var on=me.watch!==null;locbtn.setAttribute("aria-pressed",String(on));locbtn.title=on?"내 위치 끄기":"내 위치 켜기 (GPS)"}
+function onScreen(){try{return map.getBounds().contain(new kakao.maps.LatLng(me.pos.lat,me.pos.lng))}catch(e){return true}}
+function onPos(p){if(me.watch===null)return; // 끈 뒤에 늦게 도착한 위치는 무시
+  var c=p.coords,n={lat:c.latitude,lng:c.longitude,acc:c.accuracy||9999,t:p.timestamp||Date.now()},o=me.pos;
   // 15초 안의 더 정확한 값이 있으면 덜 정확한 새 값은 버림 (대략 위치가 GPS 위치를 덮지 않게)
   if(o&&n.acc>o.acc*1.5&&n.t-o.t<15000)return;
   var better=!o||n.acc<o.acc/2;
   me.pos=n;locbtn.classList.remove("wait");locbtn.classList.add("on");drawMe();updDist();
   if(me.center||(better&&me.follow&&Date.now()<me.follow)){me.center=false;centerMe()}}
 function onPosErr(e){locbtn.classList.remove("wait");
-  if(e.code===1){navigator.geolocation.clearWatch(me.watch);me.watch=null;locbtn.classList.remove("on");toast("위치 권한이 꺼져 있습니다 — 브라우저/휴대폰 설정에서 위치를 허용해 주세요")}
+  if(e.code===1){stopGps();toast("위치 권한이 꺼져 있습니다 — 브라우저/휴대폰 설정에서 위치를 허용해 주세요")}
   else if(!me.pos)toast(e.code===3?"위치 확인 시간 초과 — 잠시 후 다시 눌러 주세요":"현재 위치를 확인할 수 없습니다")}
 function drawMe(){if(!map||!me.pos)return;var C=kakao.maps,ll=new C.LatLng(me.pos.lat,me.pos.lng),r=Math.min(me.pos.acc,3000);
   if(!me.ov){var el=document.createElement("div");el.className="me";el.title="내 위치";
@@ -489,7 +499,15 @@ function drawMe(){if(!map||!me.pos)return;var C=kakao.maps,ll=new C.LatLng(me.po
   else{me.ov.setPosition(ll);me.circle.setPosition(ll);me.circle.setRadius(r)}}
 function centerMe(){if(!map||!me.pos)return;if(map.getLevel()>5)map.setLevel(5);map.panTo(new kakao.maps.LatLng(me.pos.lat,me.pos.lng))}
 function updDist(){each(function(s){var e=$("d"+s.di+"_"+s.i);if(e)e.textContent=distTxt(s)});if(cur){var c=$("cdist");if(c)c.textContent=distTxt(DAYS[cur.di].stops[cur.i])}}
-locbtn.onclick=function(){startGps(true)};
+// 내 위치 버튼: 꺼져 있으면 켜고 내 위치로 이동 / 켜져 있으면 끔
+// (켜져 있는데 내 위치가 화면 밖이면 먼저 내 위치로 이동만 하고, 한 번 더 누르면 끔)
+// 끈 상태는 기억해서 다음에 앱을 열어도 자동으로 켜지지 않음
+locbtn.onclick=function(){
+  if(me.watch===null){ls("gpsOff",null);startGps(true);if(me.watch!==null)toast("내 위치 켜짐 · 다시 누르면 꺼집니다");return}
+  if(me.pos&&map&&!onScreen()){me.follow=Date.now()+15000;centerMe();toast("내 위치로 이동 · 한 번 더 누르면 꺼집니다");return}
+  stopGps();ls("gpsOff","1");toast("내 위치 꺼짐");
+};
+setLocBtn();
 
 // ── 목록 / 탭 / 범례 (지도와 무관하게 먼저 그림) ──
 function rowHtml(D,s){var i=s.i,r=rec(s),v=r&&r.st||"",prev=i?D.stops[i-1]:null;
@@ -821,7 +839,7 @@ show(-1);
 syncUI();tick();
 if(!who)askWho(); // 처음 열면 이름부터 (누가 기록했는지 남기기 위해)
 // 위치 권한을 이미 허용했다면 바로 내 위치 표시 시작 (처음엔 ◎ 버튼을 눌러 허용)
-if(navigator.permissions&&navigator.permissions.query)navigator.permissions.query({name:"geolocation"}).then(function(p){if(p.state==="granted")startGps(false)}).catch(function(){});
+if(navigator.permissions&&navigator.permissions.query)navigator.permissions.query({name:"geolocation"}).then(function(p){if(p.state==="granted"&&ls("gpsOff")!=="1")startGps(false)}).catch(function(){});
 // 휴대폰 홈 화면 앱(PWA): 페이지를 저장해 두어 인터넷이 없을 때도 목록은 열리게 함
 if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost"))navigator.serviceWorker.register("sw.js").catch(function(){});
 function offlineMsg(){if(navigator.onLine!==false)return false;st.textContent="오프라인: 목록만 표시 중 · 지도는 인터넷 연결되면 자동으로 다시 불러옵니다";return true}
